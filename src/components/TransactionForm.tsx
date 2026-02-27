@@ -12,7 +12,13 @@ interface TransactionFormProps {
 export default function TransactionForm({ onSubmit, editingTransaction, onCancelEdit }: TransactionFormProps) {
     const [desc, setDesc] = useState('');
     const [amount, setAmount] = useState('');
-    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [date, setDate] = useState(() => {
+        const d = new Date();
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    });
     const [type, setType] = useState<TransactionType>('ingreso');
     const [category, setCategory] = useState(CATEGORIES[0]);
 

@@ -39,6 +39,11 @@ export default function Home() {
   }
 
   const handleFormSubmit = (t: any) => {
+    if (isNaN(Number(t.amount))) {
+      alert("Por favor ingrese un monto válido");
+      return;
+    }
+
     if (editingIndex !== null) {
       updateTransaction(editingIndex, t);
       setEditingIndex(null);

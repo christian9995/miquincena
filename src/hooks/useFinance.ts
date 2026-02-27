@@ -18,8 +18,21 @@ export function useFinance() {
         const savedTransactions = localStorage.getItem(STORAGE_KEY_TRANSACTIONS);
         const savedBudgets = localStorage.getItem(STORAGE_KEY_BUDGETS);
 
-        if (savedTransactions) setTransactions(JSON.parse(savedTransactions));
-        if (savedBudgets) setBudgets(JSON.parse(savedBudgets));
+        if (savedTransactions) {
+            try {
+                setTransactions(JSON.parse(savedTransactions));
+            } catch (e) {
+                console.error("Error parsing transactions", e);
+            }
+        }
+
+        if (savedBudgets) {
+            try {
+                setBudgets(JSON.parse(savedBudgets));
+            } catch (e) {
+                console.error("Error parsing budgets", e);
+            }
+        }
 
         setCurrentPeriodIndex(getCurrentPeriodIndex());
         setIsInitialized(true);
@@ -35,22 +48,26 @@ export function useFinance() {
 
     const currentPeriodData = useMemo(() => {
         const { start, end } = getPeriodDates(currentPeriodIndex);
-        const filtered = transactions.filter((t) => {
+
+        // Include the original index to fix edit/delete bugs
+        const mapped = transactions.map((t, index) => ({ ...t, originalIndex: index }));
+
+        const filtered = mapped.filter((t) => {
             const tDate = new Date(t.date + 'T00:00:00');
             return tDate >= start && tDate <= end;
         });
 
         const income = filtered
             .filter((t) => t.type === 'ingreso')
-            .reduce((sum, t) => sum + Number(t.amount), 0);
+            .reduce((sum, t) => sum + Number(t.amount || 0), 0);
         const expenses = filtered
             .filter((t) => t.type === 'egreso')
-            .reduce((sum, t) => sum + Number(t.amount), 0);
+            .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
         const categoryTotals: Record<string, number> = {};
         filtered.forEach((t) => {
             if (t.type === 'egreso') {
-                categoryTotals[t.category] = (categoryTotals[t.category] || 0) + Number(t.amount);
+                categoryTotals[t.category] = (categoryTotals[t.category] || 0) + Number(t.amount || 0);
             }
         });
 

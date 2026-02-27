@@ -49,13 +49,13 @@ export default function TransactionList({ transactions, onEdit, onDelete, search
                             </span>
                             <div className="flex gap-1">
                                 <button
-                                    onClick={() => onEdit(i)}
+                                    onClick={() => onEdit((t as any).originalIndex)}
                                     className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                                 >
                                     <Pencil size={18} />
                                 </button>
                                 <button
-                                    onClick={() => onDelete(i)}
+                                    onClick={() => onDelete((t as any).originalIndex)}
                                     className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                 >
                                     <Trash2 size={18} />
