@@ -55,6 +55,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[#f8f9fc] p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
+        <h1 className="text-3xl font-bold text-gray-800 mb-6">Mi Quincena</h1>
         <PeriodSelector
           currentIndex={currentPeriodIndex}
           onChange={setCurrentPeriodIndex}
