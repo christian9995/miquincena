@@ -13,7 +13,6 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Mi Quincena",
   description: "Gestión inteligente de finanzas personales bi-weekly",
 };
 
