@@ -69,19 +69,19 @@ export default function Home() {
             <div className="flex gap-4">
               <button
                 onClick={() => setIsBudgetModalOpen(true)}
-                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white p-4 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-purple-100 transition-all active:scale-95"
+                className="btn-budget-action flex-1 text-white p-4 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95"
               >
                 <Plus size={20} /> Definir Presupuesto
               </button>
               <button
                 onClick={() => setIsReportModalOpen(true)}
-                className="flex-1 bg-green-700 hover:bg-green-800 text-white p-4 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-green-100 transition-all active:scale-95"
+                className="btn-success-action flex-1 text-white p-4 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95"
               >
                 <BarChart3 size={20} /> Resumen Anual
               </button>
               <button
                 onClick={() => setIsConfigModalOpen(true)}
-                className="btn-config-action flex-1 bg-gray-600 hover:bg-gray-700 text-white p-4 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-gray-100 transition-all active:scale-95"
+                className="btn-config-action flex-1 text-white p-4 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95"
               >
                 <Settings size={20} /> Config. Ciclo
               </button>

@@ -44,4 +44,59 @@ body {
   .input {
     @apply w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none;
   }
+
+  /* Final Balance Card Styles */
+  .final-balance-card {
+    padding: 20px;
+    border-radius: 15px;
+  }
+
+  .balance-positive {
+    background-color: #f0fdf4;
+    border: 2px solid #22c55e;
+  }
+
+  .balance-negative {
+    background-color: #fef2f2;
+    border: 2px solid #ef4444;
+  }
+
+  /* Button Colors */
+  .btn-success-action {
+    background-color: #34a853;
+  }
+
+  .btn-success-action:hover {
+    background-color: #2d8659;
+  }
+
+  .btn-error-action {
+    background-color: #ea4335;
+  }
+
+  .btn-error-action:hover {
+    background-color: #d33425;
+  }
+
+  .btn-budget-action {
+    background-color: #673ab7;
+  }
+
+  .btn-budget-action:hover {
+    background-color: #5e35b1;
+  }
+
+  .btn-config-action {
+    background-color: #5f6368;
+  }
+
+  .btn-config-action:hover {
+    background-color: #3c4043;
+  }
+
+  /* Net Amount Large Font */
+  .net-amount {
+    font-size: 2.2em;
+    font-weight: 900;
+  }
 }

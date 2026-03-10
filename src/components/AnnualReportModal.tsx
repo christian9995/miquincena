@@ -107,7 +107,7 @@ export default function AnnualReportModal({ isOpen, onClose, transactions, budge
                 <div className="p-6 bg-gray-50 border-t flex flex-col md:flex-row justify-between items-center gap-6">
                     <div className="bg-white p-6 rounded-2xl border-2 border-blue-600 shadow-xl shadow-blue-100 text-center min-w-[250px]">
                         <h4 className="text-sm font-bold text-blue-600 uppercase tracking-widest mb-1">Annual Net Real Balance</h4>
-                        <div className={`text-4xl font-black ${reportData.netResult >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        <div className={`net-amount ${reportData.netResult >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                             {formatCurrency(reportData.netResult)}
                         </div>
                     </div>

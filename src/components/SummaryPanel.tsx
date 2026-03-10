@@ -22,7 +22,7 @@ export default function SummaryPanel({
     onClearAll
 }: SummaryPanelProps) {
     return (
-        <aside className="w-full lg:w-96 space-y-6 sticky top-6">
+        <aside className="w-full lg:w-96 space-y-6 lg:sticky lg:top-6">
             <div className="bg-white p-6 rounded-xl shadow-md space-y-4">
                 <h3 className="text-xl font-bold text-gray-800 border-b pb-2">Balance de la Quincena</h3>
 
