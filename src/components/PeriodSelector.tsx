@@ -5,10 +5,11 @@ import { getPeriodDates, formatDateShort } from '@/lib/finance-utils';
 interface PeriodSelectorProps {
     currentIndex: number;
     onChange: (index: number) => void;
+    seedDate?: string;
 }
 
-export default function PeriodSelector({ currentIndex, onChange }: PeriodSelectorProps) {
-    const { start, end } = getPeriodDates(currentIndex);
+export default function PeriodSelector({ currentIndex, onChange, seedDate }: PeriodSelectorProps) {
+    const { start, end } = getPeriodDates(currentIndex, seedDate);
     const today = new Date();
 
     return (
@@ -30,7 +31,7 @@ export default function PeriodSelector({ currentIndex, onChange }: PeriodSelecto
                         className="bg-white/20 text-white font-bold text-lg p-1 rounded-md border border-white/40 cursor-pointer outline-none mb-1"
                     >
                         {Array.from({ length: 26 }).map((_, i) => {
-                            const { start: s, end: e } = getPeriodDates(i);
+                            const { start: s, end: e } = getPeriodDates(i, seedDate);
                             const isCurrent = today >= s && today <= e;
                             return (
                                 <option key={i} value={i} className="text-gray-800">
@@ -39,7 +40,7 @@ export default function PeriodSelector({ currentIndex, onChange }: PeriodSelecto
                             );
                         })}
                     </select>
-                    <span className="text-sm opacity-90">
+                    <span className="text-sm opacity-90 range-label">
                         Del {start.toLocaleDateString()} al {end.toLocaleDateString()}
                     </span>
                 </div>

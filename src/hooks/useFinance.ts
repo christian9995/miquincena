@@ -39,9 +39,11 @@ export function useFinance() {
 
         if (savedSeedDate) {
             setSeedDate(savedSeedDate);
+            setCurrentPeriodIndex(getCurrentPeriodIndex(new Date(), savedSeedDate));
+        } else {
+            setCurrentPeriodIndex(getCurrentPeriodIndex());
         }
 
-        setCurrentPeriodIndex(getCurrentPeriodIndex());
         setIsInitialized(true);
     }, []);
 
@@ -55,7 +57,7 @@ export function useFinance() {
     }, [transactions, budgets, seedDate, isInitialized]);
 
     const currentPeriodData = useMemo(() => {
-        const { start, end } = getPeriodDates(currentPeriodIndex);
+        const { start, end } = getPeriodDates(currentPeriodIndex, seedDate);
 
         // Include the original index to fix edit/delete bugs
         const mapped = transactions.map((t, index) => ({ ...t, originalIndex: index }));
@@ -89,7 +91,7 @@ export function useFinance() {
             start,
             end,
         };
-    }, [transactions, budgets, currentPeriodIndex]);
+    }, [transactions, budgets, currentPeriodIndex, seedDate]);
 
     const addTransaction = (t: Transaction) => {
         setTransactions((prev) => [...prev, t]);
