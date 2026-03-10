@@ -61,13 +61,38 @@ body {
     border: 2px solid #ef4444;
   }
 
-  /* Button Colors */
+  /* Button Colors - Brand Colors */
+  .btn-budget-action {
+    background-color: #673ab7;
+    color: white;
+    border-radius: 8px;
+    font-weight: 700;
+  }
+
+  .btn-budget-action:hover {
+    background-color: #5e35b1;
+  }
+
   .btn-success-action {
-    background-color: #34a853;
+    background-color: #2e7d32;
+    color: white;
+    border-radius: 8px;
+    font-weight: 700;
   }
 
   .btn-success-action:hover {
-    background-color: #2d8659;
+    background-color: #256829;
+  }
+
+  .btn-config-action {
+    background-color: #5f6368;
+    color: white;
+    border-radius: 8px;
+    font-weight: 700;
+  }
+
+  .btn-config-action:hover {
+    background-color: #3c4043;
   }
 
   .btn-error-action {
@@ -76,22 +101,6 @@ body {
 
   .btn-error-action:hover {
     background-color: #d33425;
-  }
-
-  .btn-budget-action {
-    background-color: #673ab7;
-  }
-
-  .btn-budget-action:hover {
-    background-color: #5e35b1;
-  }
-
-  .btn-config-action {
-    background-color: #5f6368;
-  }
-
-  .btn-config-action:hover {
-    background-color: #3c4043;
   }
 
   /* Net Amount Large Font */
