@@ -111,10 +111,10 @@ export default function TransactionForm({ onSubmit, editingTransaction, onCancel
             <div className="form-btns flex gap-2">
                 <button
                     type="submit"
-                    className={`flex-1 p-3 rounded-lg font-bold text-white transition-all ${editingTransaction ? 'bg-orange-500 hover:bg-orange-600' : 'bg-green-600 hover:bg-green-700'
+                    className={`flex-1 p-3 rounded-lg font-bold text-white transition-all ${editingTransaction ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'
                         }`}
                 >
-                    {editingTransaction ? 'Actualizar Movimiento' : 'Registrar Movimiento'}
+                    {editingTransaction ? 'Update Movement' : 'Registrar Movimiento'}
                 </button>
                 <button
                     id="cancel-edit-btn"

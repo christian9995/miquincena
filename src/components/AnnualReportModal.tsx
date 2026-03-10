@@ -91,8 +91,8 @@ export default function AnnualReportModal({ isOpen, onClose, transactions, budge
                             ))}
                         </tbody>
                     </table>
-                    <div id="annual-balance-box" className="final-balance-card bg-blue-50 p-6 rounded-lg mt-6 shadow-md">
-                        <div className="grid grid-cols-7 gap-2 text-center font-black text-blue-900">
+                    <div id="annual-balance-box" className={`final-balance-card p-6 rounded-lg mt-6 shadow-md ${reportData.netResult >= 0 ? 'balance-positive bg-green-50' : 'balance-negative bg-red-50'}`}>
+                        <div className={`grid grid-cols-7 gap-2 text-center font-black ${reportData.netResult >= 0 ? 'text-green-900' : 'text-red-900'}`}>
                             <div className="text-left col-span-1">TOTAL ANUAL</div>
                             <div>{formatCurrency(reportData.totals.ing)}</div>
                             <div>{formatCurrency(reportData.totals.egr)}</div>

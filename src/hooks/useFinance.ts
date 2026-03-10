@@ -6,17 +6,20 @@ import { getCurrentPeriodIndex, getPeriodDates } from '@/lib/finance-utils';
 
 const STORAGE_KEY_TRANSACTIONS = 'finanzas_v2026';
 const STORAGE_KEY_BUDGETS = 'presupuestos_v2026';
+const STORAGE_KEY_SEED_DATE = 'fecha_semilla_2026';
 
 export function useFinance() {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [budgets, setBudgets] = useState<Budgets>({});
     const [currentPeriodIndex, setCurrentPeriodIndex] = useState(0);
     const [isInitialized, setIsInitialized] = useState(false);
+    const [seedDate, setSeedDate] = useState('2026-01-02');
 
     // Load data from localStorage on mount
     useEffect(() => {
         const savedTransactions = localStorage.getItem(STORAGE_KEY_TRANSACTIONS);
         const savedBudgets = localStorage.getItem(STORAGE_KEY_BUDGETS);
+        const savedSeedDate = localStorage.getItem(STORAGE_KEY_SEED_DATE);
 
         if (savedTransactions) {
             try {
@@ -34,6 +37,10 @@ export function useFinance() {
             }
         }
 
+        if (savedSeedDate) {
+            setSeedDate(savedSeedDate);
+        }
+
         setCurrentPeriodIndex(getCurrentPeriodIndex());
         setIsInitialized(true);
     }, []);
@@ -43,8 +50,9 @@ export function useFinance() {
         if (isInitialized) {
             localStorage.setItem(STORAGE_KEY_TRANSACTIONS, JSON.stringify(transactions));
             localStorage.setItem(STORAGE_KEY_BUDGETS, JSON.stringify(budgets));
+            localStorage.setItem(STORAGE_KEY_SEED_DATE, seedDate);
         }
-    }, [transactions, budgets, isInitialized]);
+    }, [transactions, budgets, seedDate, isInitialized]);
 
     const currentPeriodData = useMemo(() => {
         const { start, end } = getPeriodDates(currentPeriodIndex);
@@ -110,6 +118,10 @@ export function useFinance() {
         if (confirm('¿Borrar TODO?')) {
             setTransactions([]);
             setBudgets({});
+            setSeedDate('2026-01-02');
+            localStorage.removeItem(STORAGE_KEY_TRANSACTIONS);
+            localStorage.removeItem(STORAGE_KEY_BUDGETS);
+            localStorage.removeItem(STORAGE_KEY_SEED_DATE);
         }
     };
 
@@ -125,5 +137,7 @@ export function useFinance() {
         saveBudget,
         clearAll,
         isInitialized,
+        seedDate,
+        setSeedDate,
     };
 }

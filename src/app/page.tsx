@@ -23,6 +23,8 @@ export default function Home() {
     saveBudget,
     clearAll,
     isInitialized,
+    seedDate,
+    setSeedDate,
   } = useFinance() as any; // Casting for simplicity in this step, ideally use proper types
 
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -30,7 +32,6 @@ export default function Home() {
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
-  const [baseStartDate, setBaseStartDate] = useState('2026-01-01');
 
   if (!isInitialized) {
     return (
@@ -152,8 +153,8 @@ export default function Home() {
               <input
                 id="base-start-date"
                 type="date"
-                value={baseStartDate}
-                onChange={(e) => setBaseStartDate(e.target.value)}
+                value={seedDate}
+                onChange={(e) => setSeedDate(e.target.value)}
                 className="w-full p-3 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-gray-600"
               />
             </div>
