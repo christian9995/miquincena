@@ -90,23 +90,23 @@ export default function AnnualReportModal({ isOpen, onClose, transactions, budge
                                 </tr>
                             ))}
                         </tbody>
-                        <tfoot className="sticky bottom-0 bg-blue-50 z-10 font-black text-blue-900 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
-                            <tr>
-                                <td className="p-4 border text-left">TOTAL ANUAL</td>
-                                <td className="p-4 border">{formatCurrency(reportData.totals.ing)}</td>
-                                <td className="p-4 border">{formatCurrency(reportData.totals.egr)}</td>
-                                <td className="p-4 border opacity-50">{formatCurrency(reportData.totals.mIng)}</td>
-                                <td className="p-4 border opacity-50">{formatCurrency(reportData.totals.lEgr)}</td>
-                                <td className="p-4 border">{formatCurrency(reportData.totals.dIng)}</td>
-                                <td className="p-4 border">{formatCurrency(reportData.totals.dEgr)}</td>
-                            </tr>
-                        </tfoot>
                     </table>
+                    <div id="annual-balance-box" className="final-balance-card bg-blue-50 p-6 rounded-lg mt-6 shadow-md">
+                        <div className="grid grid-cols-7 gap-2 text-center font-black text-blue-900">
+                            <div className="text-left col-span-1">TOTAL ANUAL</div>
+                            <div>{formatCurrency(reportData.totals.ing)}</div>
+                            <div>{formatCurrency(reportData.totals.egr)}</div>
+                            <div className="opacity-50">{formatCurrency(reportData.totals.mIng)}</div>
+                            <div className="opacity-50">{formatCurrency(reportData.totals.lEgr)}</div>
+                            <div>{formatCurrency(reportData.totals.dIng)}</div>
+                            <div>{formatCurrency(reportData.totals.dEgr)}</div>
+                        </div>
+                    </div>
                 </div>
 
                 <div className="p-6 bg-gray-50 border-t flex flex-col md:flex-row justify-between items-center gap-6">
                     <div className="bg-white p-6 rounded-2xl border-2 border-blue-600 shadow-xl shadow-blue-100 text-center min-w-[250px]">
-                        <h4 className="text-sm font-bold text-blue-600 uppercase tracking-widest mb-1">Balance Neto Real Anual</h4>
+                        <h4 className="text-sm font-bold text-blue-600 uppercase tracking-widest mb-1">Annual Net Real Balance</h4>
                         <div className={`text-4xl font-black ${reportData.netResult >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                             {formatCurrency(reportData.netResult)}
                         </div>

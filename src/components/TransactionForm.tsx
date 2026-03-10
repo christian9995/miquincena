@@ -108,7 +108,7 @@ export default function TransactionForm({ onSubmit, editingTransaction, onCancel
                 </div>
             )}
 
-            <div className="flex gap-2">
+            <div className="form-btns flex gap-2">
                 <button
                     type="submit"
                     className={`flex-1 p-3 rounded-lg font-bold text-white transition-all ${editingTransaction ? 'bg-orange-500 hover:bg-orange-600' : 'bg-green-600 hover:bg-green-700'
@@ -116,15 +116,14 @@ export default function TransactionForm({ onSubmit, editingTransaction, onCancel
                 >
                     {editingTransaction ? 'Actualizar Movimiento' : 'Registrar Movimiento'}
                 </button>
-                {editingTransaction && (
-                    <button
-                        type="button"
-                        onClick={onCancelEdit}
-                        className="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg font-bold hover:bg-gray-300"
-                    >
-                        Cancelar
-                    </button>
-                )}
+                <button
+                    id="cancel-edit-btn"
+                    type="button"
+                    onClick={onCancelEdit}
+                    className={`px-4 py-3 bg-gray-200 text-gray-700 rounded-lg font-bold hover:bg-gray-300 ${!editingTransaction ? 'hidden' : ''}`}
+                >
+                    Cancelar
+                </button>
             </div>
         </form>
     );

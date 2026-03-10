@@ -8,7 +8,7 @@ import SummaryPanel from '@/components/SummaryPanel';
 import TransactionList from '@/components/TransactionList';
 import BudgetModal from '@/components/BudgetModal';
 import AnnualReportModal from '@/components/AnnualReportModal';
-import { Search, Plus, BarChart3 } from 'lucide-react';
+import { Search, Plus, BarChart3, Settings } from 'lucide-react';
 
 export default function Home() {
   const {
@@ -29,6 +29,8 @@ export default function Home() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
+  const [baseStartDate, setBaseStartDate] = useState('2026-01-01');
 
   if (!isInitialized) {
     return (
@@ -75,6 +77,12 @@ export default function Home() {
                 className="flex-1 bg-green-700 hover:bg-green-800 text-white p-4 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-green-100 transition-all active:scale-95"
               >
                 <BarChart3 size={20} /> Resumen Anual
+              </button>
+              <button
+                onClick={() => setIsConfigModalOpen(true)}
+                className="btn-config-action flex-1 bg-gray-600 hover:bg-gray-700 text-white p-4 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-gray-100 transition-all active:scale-95"
+              >
+                <Settings size={20} /> Config. Ciclo
               </button>
             </div>
 
@@ -130,6 +138,43 @@ export default function Home() {
         transactions={transactions}
         budgets={budgets}
       />
+
+      <div id="config-modal" className={`fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 ${isConfigModalOpen ? '' : 'hidden'}`}>
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+          <div className="bg-gray-600 p-6 text-white text-center flex-shrink-0">
+            <h3 className="text-2xl font-bold">⚙️ Configurar Ciclo</h3>
+            <p className="text-white/80 text-sm mt-1">Fecha de inicio del ciclo</p>
+          </div>
+
+          <div className="p-6 space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Fecha de inicio del ciclo</label>
+              <input
+                id="base-start-date"
+                type="date"
+                value={baseStartDate}
+                onChange={(e) => setBaseStartDate(e.target.value)}
+                className="w-full p-3 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-gray-600"
+              />
+            </div>
+          </div>
+
+          <div className="p-6 bg-gray-50 border-t flex gap-3">
+            <button
+              onClick={() => setIsConfigModalOpen(false)}
+              className="flex-1 px-6 py-3 bg-gray-600 text-white rounded-lg font-bold hover:bg-gray-700 transition-all"
+            >
+              Guardar
+            </button>
+            <button
+              onClick={() => setIsConfigModalOpen(false)}
+              className="flex-1 px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-bold hover:bg-gray-300 transition-all"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </div>
     </main>
   );
 }
