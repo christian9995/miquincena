@@ -9,13 +9,14 @@ interface AnnualReportModalProps {
     onClose: () => void;
     transactions: Transaction[];
     budgets: Budgets;
+    seedDate?: string;
 }
 
-export default function AnnualReportModal({ isOpen, onClose, transactions, budgets }: AnnualReportModalProps) {
+export default function AnnualReportModal({ isOpen, onClose, transactions, budgets, seedDate }: AnnualReportModalProps) {
     const reportData = useMemo(() => {
         let totals = { ing: 0, egr: 0, mIng: 0, lEgr: 0, dIng: 0, dEgr: 0 };
         const rows = Array.from({ length: 26 }).map((_, i) => {
-            const { start, end } = getPeriodDates(i);
+            const { start, end } = getPeriodDates(i, seedDate);
             const b = budgets[i] || { income: 0, expense: 0 };
             let qIng = 0, qEgr = 0;
 
@@ -48,7 +49,7 @@ export default function AnnualReportModal({ isOpen, onClose, transactions, budge
         });
 
         return { rows, totals, netResult: totals.ing - totals.egr };
-    }, [transactions, budgets]);
+    }, [transactions, budgets, seedDate]);
 
     if (!isOpen) return null;
 

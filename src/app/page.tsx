@@ -146,6 +146,7 @@ export default function Home() {
         onClose={() => setIsReportModalOpen(false)}
         transactions={transactions}
         budgets={budgets}
+        seedDate={seedDate}
       />
 
       <div id="config-modal" className={`fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 ${isConfigModalOpen ? '' : 'hidden'}`}>
