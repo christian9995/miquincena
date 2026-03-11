@@ -47,10 +47,6 @@ body {
 
   /* Final Balance Card Styles */
   .final-balance-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
     padding: 20px;
     border-radius: 15px;
   }
@@ -107,20 +103,9 @@ body {
     background-color: #d33425;
   }
 
-  /* Net Amount Responsive Font */
+  /* Net Amount Large Font */
   .net-amount {
-    font-size: 1.5rem;
+    font-size: 2.2em;
     font-weight: 900;
-    text-align: center;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    word-wrap: break-word;
-    max-width: 100%;
-  }
-
-  @media (min-width: 768px) {
-    .net-amount {
-      font-size: 2.2em;
-    }
   }
 }
