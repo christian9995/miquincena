@@ -61,47 +61,49 @@ export default function AnnualReportModal({ isOpen, onClose, transactions, budge
                     <p className="text-white/80 text-sm mt-1">Reporte detallado del desempeño financiero</p>
                 </div>
 
-                <div className="flex-1 overflow-auto p-6">
-                    <table className="w-full text-sm text-right border-collapse">
-                        <thead className="sticky top-0 bg-gray-50 z-10">
-                            <tr>
-                                <th className="p-3 border text-left bg-gray-100">Quincena</th>
-                                <th className="p-3 border bg-gray-100">Ing. Real</th>
-                                <th className="p-3 border bg-gray-100">Egr. Real</th>
-                                <th className="p-3 border bg-gray-100 italic opacity-70">Meta Ing.</th>
-                                <th className="p-3 border bg-gray-100 italic opacity-70">Lím. Egr.</th>
-                                <th className="p-3 border bg-gray-100">Dif. Ingreso</th>
-                                <th className="p-3 border bg-gray-100">Dif. Egreso</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {reportData.rows.map((row, i) => (
-                                <tr key={i} className="hover:bg-gray-50 transition-colors">
-                                    <td className="p-3 border text-left font-medium text-gray-600">{row.label}</td>
-                                    <td className="p-3 border font-bold text-green-600">{formatCurrency(row.qIng)}</td>
-                                    <td className="p-3 border font-bold text-red-600">{formatCurrency(row.qEgr)}</td>
-                                    <td className="p-3 border text-gray-400">{formatCurrency(row.metaIng)}</td>
-                                    <td className="p-3 border text-gray-400">{formatCurrency(row.metaEgr)}</td>
-                                    <td className={`p-3 border font-black ${row.diffI <= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                                        {formatCurrency(row.diffI)}
-                                    </td>
-                                    <td className={`p-3 border font-black ${row.diffE >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                                        {formatCurrency(row.diffE)}
-                                    </td>
+                <div className="flex-1 overflow-y-auto">
+                    <div className="p-6">
+                        <table className="w-full text-sm text-right border-collapse">
+                            <thead className="sticky top-0 bg-gray-50 z-10 shadow-sm">
+                                <tr>
+                                    <th className="p-3 border text-left bg-gray-100">Quincena</th>
+                                    <th className="p-3 border bg-gray-100">Ing. Real</th>
+                                    <th className="p-3 border bg-gray-100">Egr. Real</th>
+                                    <th className="p-3 border bg-gray-100 italic opacity-70">Meta Ing.</th>
+                                    <th className="p-3 border bg-gray-100 italic opacity-70">Lím. Egr.</th>
+                                    <th className="p-3 border bg-gray-100">Dif. Ingreso</th>
+                                    <th className="p-3 border bg-gray-100">Dif. Egreso</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                    <div id="annual-balance-box" className={`final-balance-card p-6 rounded-lg mt-6 shadow-md ${reportData.netResult >= 0 ? 'balance-positive bg-green-50' : 'balance-negative bg-red-50'}`}>
-                        <div className={`grid grid-cols-7 gap-2 text-center font-black ${reportData.netResult >= 0 ? 'text-green-900' : 'text-red-900'}`}>
-                            <div className="text-left col-span-1">TOTAL ANUAL</div>
-                            <div>{formatCurrency(reportData.totals.ing)}</div>
-                            <div>{formatCurrency(reportData.totals.egr)}</div>
-                            <div className="opacity-50">{formatCurrency(reportData.totals.mIng)}</div>
-                            <div className="opacity-50">{formatCurrency(reportData.totals.lEgr)}</div>
-                            <div>{formatCurrency(reportData.totals.dIng)}</div>
-                            <div>{formatCurrency(reportData.totals.dEgr)}</div>
-                        </div>
+                            </thead>
+                            <tbody>
+                                {reportData.rows.map((row, i) => (
+                                    <tr key={i} className="hover:bg-gray-50 transition-colors">
+                                        <td className="p-3 border text-left font-medium text-gray-600">{row.label}</td>
+                                        <td className="p-3 border font-bold text-green-600">{formatCurrency(row.qIng)}</td>
+                                        <td className="p-3 border font-bold text-red-600">{formatCurrency(row.qEgr)}</td>
+                                        <td className="p-3 border text-gray-400">{formatCurrency(row.metaIng)}</td>
+                                        <td className="p-3 border text-gray-400">{formatCurrency(row.metaEgr)}</td>
+                                        <td className={`p-3 border font-black ${row.diffI <= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                            {formatCurrency(row.diffI)}
+                                        </td>
+                                        <td className={`p-3 border font-black ${row.diffE >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                            {formatCurrency(row.diffE)}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                            <tfoot className="sticky bottom-0 bg-blue-50 z-10 border-t-2 border-blue-300 shadow-lg">
+                                <tr>
+                                    <td className="p-3 border text-left font-black text-blue-900">TOTAL ANUAL</td>
+                                    <td className="p-3 border font-black text-blue-900">{formatCurrency(reportData.totals.ing)}</td>
+                                    <td className="p-3 border font-black text-blue-900">{formatCurrency(reportData.totals.egr)}</td>
+                                    <td className="p-3 border font-black text-blue-900 opacity-75">{formatCurrency(reportData.totals.mIng)}</td>
+                                    <td className="p-3 border font-black text-blue-900 opacity-75">{formatCurrency(reportData.totals.lEgr)}</td>
+                                    <td className="p-3 border font-black text-blue-900">{formatCurrency(reportData.totals.dIng)}</td>
+                                    <td className="p-3 border font-black text-blue-900">{formatCurrency(reportData.totals.dEgr)}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
                     </div>
                 </div>
 
