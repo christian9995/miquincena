@@ -49,6 +49,11 @@ body {
   .final-balance-card {
     padding: 20px;
     border-radius: 15px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
   }
 
   .balance-positive {
@@ -59,6 +64,29 @@ body {
   .balance-negative {
     background-color: #fef2f2;
     border: 2px solid #ef4444;
+  }
+
+  /* Net Amount Responsive Styles */
+  .net-amount {
+    font-size: 1.5rem;
+    font-weight: 900;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    word-wrap: break-word;
+    max-width: 100%;
+  }
+
+  @media (min-width: 768px) {
+    .net-amount {
+      font-size: 2.2em;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .net-amount {
+      font-size: 2.2em;
+    }
   }
 
   /* Button Colors - Brand Colors */
@@ -101,11 +129,5 @@ body {
 
   .btn-error-action:hover {
     background-color: #d33425;
-  }
-
-  /* Net Amount Large Font */
-  .net-amount {
-    font-size: 2.2em;
-    font-weight: 900;
   }
 }

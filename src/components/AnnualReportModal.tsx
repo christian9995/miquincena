@@ -105,16 +105,16 @@ export default function AnnualReportModal({ isOpen, onClose, transactions, budge
                     </div>
                 </div>
 
-                <div className="p-6 bg-gray-50 border-t flex flex-col md:flex-row justify-between items-center gap-6">
-                    <div className="bg-white p-6 rounded-2xl border-2 border-blue-600 shadow-xl shadow-blue-100 text-center min-w-[250px]">
-                        <h4 className="text-sm font-bold text-blue-600 uppercase tracking-widest mb-1">Annual Net Real Balance</h4>
+                <div className="p-4 md:p-6 bg-gray-50 border-t flex flex-col md:flex-row justify-between items-center gap-4 md:gap-6">
+                    <div className="bg-white px-4 md:px-6 py-6 rounded-2xl border-2 border-blue-600 shadow-xl shadow-blue-100 text-center w-full md:w-auto md:min-w-[250px]">
+                        <h4 className="text-xs md:text-sm font-bold text-blue-600 uppercase tracking-widest mb-2 md:mb-1">Annual Net Real Balance</h4>
                         <div className={`net-amount ${reportData.netResult >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                             {formatCurrency(reportData.netResult)}
                         </div>
                     </div>
                     <button
                         onClick={onClose}
-                        className="w-full md:w-auto px-12 py-4 bg-gray-800 text-white rounded-xl font-bold hover:bg-gray-900 transition-all shadow-lg"
+                        className="w-full md:w-auto px-8 md:px-12 py-3 md:py-4 bg-gray-800 text-white text-sm md:text-base rounded-xl font-bold hover:bg-gray-900 transition-all shadow-lg"
                     >
                         Cerrar Reporte
                     </button>
