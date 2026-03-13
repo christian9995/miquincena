@@ -107,20 +107,20 @@ export default function AnnualReportModal({ isOpen, onClose, transactions, budge
                     </div>
                 </div>
 
-                <div className="p-6 bg-gray-50 border-t">
-                    <div className="grid grid-cols-2 gap-4">
-                        <button
-                            onClick={onClose}
-                            className="px-4 py-4 md:px-6 md:py-4 bg-gray-800 text-white rounded-xl font-bold hover:bg-gray-900 transition-all shadow-lg text-sm md:text-base"
-                        >
-                            Cerrar Reporte
-                        </button>
-                        <div id="annual-balance-box" className="bg-white px-4 py-4 md:px-6 md:py-4 rounded-xl border-2 border-blue-600 shadow-xl shadow-blue-100 text-center flex flex-col justify-center items-center">
-                            <h4 className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-1 md:mb-2">Balance real anual</h4>
-                            <div className={`net-amount text-lg md:text-2xl ${reportData.netResult >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                <div className="px-6 py-4 bg-white border-t border-gray-100">
+                    <div className="grid grid-cols-2 gap-3 h-full">
+                        <div id="annual-balance-box" className="bg-blue-50 px-4 py-2 rounded-lg border border-blue-200 text-center flex flex-col justify-center items-center">
+                            <h4 className="text-xs font-semibold text-blue-600 uppercase tracking-tight mb-0.5">Balance real anual</h4>
+                            <div className={`net-amount text-base md:text-lg font-black ${reportData.netResult >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                 {formatCurrency(reportData.netResult)}
                             </div>
                         </div>
+                        <button
+                            onClick={onClose}
+                            className="px-4 py-2 bg-gray-800 text-white rounded-lg font-semibold hover:bg-gray-900 transition-all text-sm md:text-base"
+                        >
+                            Cerrar Reporte
+                        </button>
                     </div>
                 </div>
             </div>
