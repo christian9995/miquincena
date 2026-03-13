@@ -1,29 +1,44 @@
-export const START_DATE_2026 = new Date('2026-01-02T00:00:00');
+export const START_DATE_2026 = new Date('2026-01-01T00:00:00');
+export const END_DATE_2026 = new Date('2026-12-31T23:59:59');
 
 export function getPeriodDates(index: number, seedDate?: string) {
-    let baseDate: Date;
-    
+    // Calculate day-of-week offset from seedDate
+    let offsetDays = 0;
     if (seedDate) {
-        baseDate = new Date(seedDate + 'T00:00:00');
-    } else {
-        baseDate = new Date(START_DATE_2026);
+        const seedDateObj = new Date(seedDate + 'T00:00:00');
+        const jan1 = new Date('2026-01-01T00:00:00');
+        offsetDays = Math.floor((seedDateObj.getTime() - jan1.getTime()) / (1000 * 60 * 60 * 24));
     }
     
-    const start = new Date(baseDate);
-    start.setDate(start.getDate() + (index * 14));
+    // Generate period starting from January 1st, 2026 with offset
+    const start = new Date(START_DATE_2026);
+    start.setDate(start.getDate() + offsetDays + (index * 14));
+    
     const end = new Date(start);
     end.setDate(end.getDate() + 13);
+    
+    // Constrain to 2026 bounds
+    if (start > END_DATE_2026) {
+        start.setTime(END_DATE_2026.getTime());
+    }
+    if (end > END_DATE_2026) {
+        end.setTime(END_DATE_2026.getTime());
+    }
+    
     return { start, end };
 }
 
 export function getCurrentPeriodIndex(date: Date = new Date(), seedDate?: string): number {
-    let baseDate: Date;
-    
+    // Calculate day-of-week offset from seedDate
+    let offsetDays = 0;
     if (seedDate) {
-        baseDate = new Date(seedDate + 'T00:00:00');
-    } else {
-        baseDate = new Date(START_DATE_2026);
+        const seedDateObj = new Date(seedDate + 'T00:00:00');
+        const jan1 = new Date('2026-01-01T00:00:00');
+        offsetDays = Math.floor((seedDateObj.getTime() - jan1.getTime()) / (1000 * 60 * 60 * 24));
     }
+    
+    const baseDate = new Date(START_DATE_2026);
+    baseDate.setDate(baseDate.getDate() + offsetDays);
     
     const diffTime = date.getTime() - baseDate.getTime();
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
