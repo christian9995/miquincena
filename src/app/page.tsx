@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useFinance } from '@/hooks/useFinance';
-import { getCurrentPeriodIndex } from '@/lib/finance-utils';
 import PeriodSelector from '@/components/PeriodSelector';
 import TransactionForm from '@/components/TransactionForm';
 import SummaryPanel from '@/components/SummaryPanel';
@@ -33,12 +32,6 @@ export default function Home() {
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
-
-  // Recalculate current period index when seed date changes
-  useEffect(() => {
-    const newPeriodIndex = getCurrentPeriodIndex(new Date(), seedDate);
-    setCurrentPeriodIndex(newPeriodIndex);
-  }, [seedDate, setCurrentPeriodIndex]);
 
   if (!isInitialized) {
     return (
