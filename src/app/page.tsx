@@ -38,7 +38,7 @@ export default function Home() {
   useEffect(() => {
     const newPeriodIndex = getCurrentPeriodIndex(new Date(), seedDate);
     setCurrentPeriodIndex(newPeriodIndex);
-  }, [seedDate]);
+  }, [seedDate, setCurrentPeriodIndex]);
 
   if (!isInitialized) {
     return (
