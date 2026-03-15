@@ -5,6 +5,29 @@
 
 import { AppState } from './google-drive';
 
+// Re-export the conflict resolver at the top level for easier imports
+export function resolveSyncConflict(
+  local: any,
+  remote: any
+): any {
+  const localTimestamp = local.timestamp || 0;
+  const remoteTimestamp = remote.timestamp || 0;
+
+  console.log('[v0] Resolving sync conflict');
+  console.log('[v0] Local timestamp:', localTimestamp);
+  console.log('[v0] Remote timestamp:', remoteTimestamp);
+
+  // Remote is newer: use remote data
+  if (remoteTimestamp > localTimestamp) {
+    console.log('[v0] Remote data is newer, using remote');
+    return remote;
+  }
+
+  // Local is newer or equal: use local data
+  console.log('[v0] Local data is newer or equal, using local');
+  return local;
+}
+
 interface SyncQueueItem {
   operation: 'save' | 'load';
   timestamp: number;
@@ -171,29 +194,3 @@ class SyncManager {
 
 // Export singleton instance
 export const syncManager = new SyncManager();
-
-/**
- * Resolve sync conflicts between local and remote app state
- * Returns the most recent version based on timestamps
- */
-export function resolveSyncConflict(
-  local: any,
-  remote: any
-): any {
-  const localTimestamp = local.timestamp || 0;
-  const remoteTimestamp = remote.timestamp || 0;
-
-  console.log('[v0] Resolving sync conflict');
-  console.log('[v0] Local timestamp:', localTimestamp);
-  console.log('[v0] Remote timestamp:', remoteTimestamp);
-
-  // Remote is newer: use remote data
-  if (remoteTimestamp > localTimestamp) {
-    console.log('[v0] Remote data is newer, using remote');
-    return remote;
-  }
-
-  // Local is newer or equal: use local data
-  console.log('[v0] Local data is newer or equal, using local');
-  return local;
-}
