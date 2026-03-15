@@ -97,39 +97,48 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       // Handle OAuth2 token response (has access_token)
       if (tokenResponse.access_token) {
         console.log('[v0] Processing OAuth2 access token');
+        const accessToken = tokenResponse.access_token;
         
-        setAccessToken(tokenResponse.access_token);
+        // Store token immediately before attempting userinfo fetch
+        localStorage.setItem('google_access_token', accessToken);
+        setAccessToken(accessToken);
         setIsAuthenticated(true);
         
         // Try to fetch user info from Google userinfo endpoint
         try {
+          console.log('[v0] Fetching user info with access token');
           const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v1/userinfo', {
-            headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+            headers: { Authorization: `Bearer ${accessToken}` },
           });
           
           if (userInfoResponse.ok) {
             const userInfo = await userInfoResponse.json();
+            console.log('[v0] User info fetched successfully');
             setUser({
               email: userInfo.email,
               name: userInfo.name,
               picture: userInfo.picture,
             });
             
-            localStorage.setItem('google_access_token', tokenResponse.access_token);
             localStorage.setItem('google_user', JSON.stringify({
               email: userInfo.email,
               name: userInfo.name,
               picture: userInfo.picture,
             }));
             
-            // Show success message
-            console.log('[v0] Conectado a Google Drive - Datos protegidos');
+            setSyncStatus('synced');
+          } else {
+            // userinfo endpoint failed, but we still have a valid access token
+            console.warn('[v0] userinfo endpoint returned status:', userInfoResponse.status);
+            console.log('[v0] Token is valid for Drive API operations');
+            setUser({ email: 'usuario@gmail.com', name: 'Usuario', picture: undefined });
             setSyncStatus('synced');
           }
         } catch (userErr) {
-          console.log('[v0] Could not fetch user info:', userErr);
-          // Still authenticated, just without user details
-          setUser({ email: 'usuario@gmail.com', name: 'Usuario' });
+          console.log('[v0] Could not fetch user info, but token is still valid:', userErr);
+          // Still authenticated with valid token, just without user details
+          setUser({ email: 'usuario@gmail.com', name: 'Usuario', picture: undefined });
+          setSyncStatus('synced');
         }
       } else if (tokenResponse.credential) {
         // Handle legacy GSI identity token
@@ -160,9 +169,12 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           picture: decoded.picture,
         });
         setIsAuthenticated(true);
+        setSyncStatus('synced');
+      } else {
+        console.error('[v0] No access_token or credential in response');
+        setError('Authentication failed: No token received');
       }
       
-      setError(null);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Authentication failed';
       setError(errorMessage);

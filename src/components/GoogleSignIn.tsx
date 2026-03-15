@@ -110,17 +110,23 @@ export default function GoogleSignIn() {
       }
     };
 
-    const handleTokenResponse = async (response: any) => {
-      if (response.access_token) {
-        console.log('[v0] Access token received, calling signIn');
-        await signIn({
-          access_token: response.access_token,
-          token_type: response.token_type || 'Bearer',
-        });
-      } else {
-        console.error('[v0] No access token in response');
-      }
-    };
+  const handleTokenResponse = async (response: any) => {
+    console.log('[v0] OAuth2 token response received');
+    console.log('[v0] Response keys:', Object.keys(response));
+    
+    if (response.access_token) {
+      console.log('[v0] Access token present, length:', response.access_token.length);
+      console.log('[v0] Calling signIn with token');
+      await signIn({
+        access_token: response.access_token,
+        token_type: response.token_type || 'Bearer',
+      });
+    } else if (response.error) {
+      console.error('[v0] OAuth2 error:', response.error, response.error_description);
+    } else {
+      console.error('[v0] No access token in response:', response);
+    }
+  };
 
     initWhenReady();
 

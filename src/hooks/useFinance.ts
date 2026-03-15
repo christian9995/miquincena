@@ -109,7 +109,9 @@ export function useFinance() {
 
         // If authenticated and online, queue sync to Drive
         if (isAuthenticated && accessToken && isOnline) {
-            console.log('[v0] Queuing Drive sync');
+            console.log('[v0] Drive sync eligible: authenticated=true, token exists, online=true');
+            console.log('[v0] Token length:', accessToken?.length);
+            
             updateSyncStatus(true);
 
             if (syncTimeoutRef.current) {
@@ -118,8 +120,15 @@ export function useFinance() {
 
             syncTimeoutRef.current = setTimeout(async () => {
                 try {
+                    // Verify token is still valid before syncing
+                    if (!accessToken || accessToken.length < 10) {
+                        console.error('[v0] Token missing or invalid before sync attempt');
+                        updateSyncStatus(false, 'offline');
+                        return;
+                    }
+
                     updateSyncStatus(true);
-                    console.log('[v0] Starting Drive sync');
+                    console.log('[v0] Starting Drive sync with token');
                     await saveAppStateToDrive(accessToken, {
                         transactions,
                         budgets,
@@ -138,6 +147,11 @@ export function useFinance() {
             // Mark as pending sync when offline
             console.log('[v0] Offline: marking data as pending sync');
             updateSyncStatus(false, 'pending');
+        } else if (isAuthenticated && !accessToken) {
+            console.log('[v0] Authenticated but no access token available');
+            updateSyncStatus(false, 'offline');
+        } else if (!isAuthenticated) {
+            console.log('[v0] Not authenticated, skipping Drive sync');
         }
 
         return () => {

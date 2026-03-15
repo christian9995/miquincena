@@ -23,19 +23,43 @@ interface DriveFile {
  */
 async function findOrCreateFile(accessToken: string): Promise<string> {
   try {
+    // Validate token format
+    if (!accessToken || typeof accessToken !== 'string') {
+      console.error('[v0] Invalid token format:', typeof accessToken);
+      throw new Error('Invalid or missing access token');
+    }
+
+    if (accessToken.length < 10) {
+      console.error('[v0] Token appears to be invalid (too short)');
+      throw new Error('Access token appears invalid');
+    }
+
     console.log('[v0] Searching for existing data file in Google Drive');
+    console.log('[v0] Token length:', accessToken.length);
+    console.log('[v0] Token prefix:', accessToken.substring(0, 20) + '...');
     
     // Search for existing file in appDataFolder
     const searchResponse = await fetch(
       `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='${FILE_NAME}'&fields=files(id)`,
       {
-        headers: { Authorization: `Bearer ${accessToken}` },
+        headers: { 
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
       }
     );
 
+    console.log('[v0] Search response status:', searchResponse.status, searchResponse.statusText);
+
     if (!searchResponse.ok) {
       const errorText = await searchResponse.text();
-      console.error('[v0] Drive Search Error:', searchResponse.status, searchResponse.statusText, errorText);
+      console.error('[v0] Drive Search Error:', searchResponse.status, searchResponse.statusText);
+      console.error('[v0] Error response body:', errorText);
+      
+      if (searchResponse.status === 401) {
+        console.error('[v0] Authentication failed - token may be expired or invalid');
+      }
+      
       throw new Error(`Search failed with status ${searchResponse.status}: ${searchResponse.statusText}`);
     }
 
@@ -47,6 +71,7 @@ async function findOrCreateFile(accessToken: string): Promise<string> {
     }
 
     // File doesn't exist, create it with empty data
+    console.log('[v0] No existing file found, creating new one');
     const initialData: AppState = {
       transactions: [],
       budgets: {},
@@ -99,20 +124,32 @@ async function findOrCreateFile(accessToken: string): Promise<string> {
  */
 export async function loadAppStateFromDrive(accessToken: string): Promise<AppState | null> {
   try {
+    if (!accessToken) {
+      console.log('[v0] No access token available for loading from Drive');
+      return null;
+    }
+
     console.log('[v0] Loading app state from Google Drive');
+    console.log('[v0] Token prefix:', accessToken.substring(0, 20) + '...');
     
     // Search for existing file
     const searchResponse = await fetch(
       `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='${FILE_NAME}'&fields=files(id,modifiedTime)`,
       {
-        headers: { Authorization: `Bearer ${accessToken}` },
+        headers: { 
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
       }
     );
 
+    console.log('[v0] Load Search response status:', searchResponse.status);
+
     if (!searchResponse.ok) {
       const errorText = await searchResponse.text();
-      console.error('[v0] Drive Load Search Error:', searchResponse.status, searchResponse.statusText, errorText);
-      throw new Error(`Search failed with status ${searchResponse.status}: ${searchResponse.statusText}`);
+      console.error('[v0] Drive Load Search Error:', searchResponse.status, searchResponse.statusText);
+      console.error('[v0] Error response:', errorText);
+      return null;
     }
 
     const searchData = await searchResponse.json();
@@ -135,8 +172,8 @@ export async function loadAppStateFromDrive(accessToken: string): Promise<AppSta
 
     if (!contentResponse.ok) {
       const errorText = await contentResponse.text();
-      console.error('[v0] Drive Load Content Error:', contentResponse.status, contentResponse.statusText, errorText);
-      throw new Error(`Content load failed with status ${contentResponse.status}: ${contentResponse.statusText}`);
+      console.error('[v0] Drive Load Content Error:', contentResponse.status, contentResponse.statusText);
+      return null;
     }
 
     const appState = await contentResponse.json();
@@ -144,7 +181,6 @@ export async function loadAppStateFromDrive(accessToken: string): Promise<AppSta
     return appState;
   } catch (err) {
     console.error('[v0] Error loading app state from Drive:', err);
-    // Return null instead of throwing to allow graceful fallback
     return null;
   }
 }
