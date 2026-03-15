@@ -16,7 +16,7 @@ interface GoogleAuthContextType {
   signIn: (response: GoogleAuthResponse) => Promise<void>;
   signOut: () => Promise<void>;
   error: string | null;
-  updateSyncStatus: (isSyncing: boolean, status?: 'synced' | 'pending' | 'error') => void;
+  updateSyncStatus: (isSyncing: boolean, status?: 'synced' | 'pending' | 'error' | 'offline') => void;
   triggerPendingSync: () => Promise<void>;
 }
 
@@ -209,7 +209,7 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   }, []);
 
-  const updateSyncStatus = useCallback((syncing: boolean, status?: 'synced' | 'pending' | 'error') => {
+  const updateSyncStatus = useCallback((syncing: boolean, status?: 'synced' | 'pending' | 'error' | 'offline') => {
     setIsSyncing(syncing);
     
     if (!syncing) {
@@ -222,7 +222,7 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         localStorage.setItem('google_last_sync', now.toString());
         localStorage.setItem('google_pending_sync', 'false');
         setHasPendingSync(false);
-      } else if (newStatus === 'pending') {
+      } else if (newStatus === 'pending' || newStatus === 'offline') {
         localStorage.setItem('google_pending_sync', 'true');
         setHasPendingSync(true);
       }
