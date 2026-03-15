@@ -31,27 +31,7 @@ export default function GoogleSignIn() {
       return;
     }
 
-    // Check if script is already loaded
-    if (!window.google) {
-      const script = document.createElement('script');
-      script.src = 'https://accounts.google.com/gsi/client';
-      script.async = true;
-      script.defer = true;
-      
-      script.onload = () => {
-        initializeGSI();
-      };
-
-      script.onerror = () => {
-        console.error('[v0] Failed to load Google GSI script');
-      };
-
-      document.head.appendChild(script);
-    } else {
-      // Script already loaded, just initialize
-      initializeGSI();
-    }
-
+    // Define initialization function first
     const initializeGSI = () => {
       if (window.__googleGSIInitialized) {
         return;
@@ -86,6 +66,27 @@ export default function GoogleSignIn() {
         }
       }
     };
+
+    // Check if script is already loaded
+    if (!window.google) {
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      
+      script.onload = () => {
+        initializeGSI();
+      };
+
+      script.onerror = () => {
+        console.error('[v0] Failed to load Google GSI script');
+      };
+
+      document.head.appendChild(script);
+    } else {
+      // Script already loaded, just initialize
+      initializeGSI();
+    }
   }, []);
 
   return (
