@@ -5,7 +5,7 @@
 
 const FILE_NAME = 'miquincena-data.json';
 
-interface AppState {
+export interface AppState {
   transactions: any[];
   budgets: Record<string, any>;
   seedDate: string;
