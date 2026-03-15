@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Menu, X, LogOut, Cloud, CloudOff } from 'lucide-react';
+import { Menu, X, LogOut, Cloud, AlertCircle, Wifi } from 'lucide-react';
 import { useGoogleAuth } from '@/context/GoogleAuthContext';
 import GoogleSignIn from './GoogleSignIn';
 
@@ -12,7 +12,7 @@ interface HeaderProps {
 export default function Header({ onConfigClick }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<'about' | 'guide' | null>(null);
-  const { isAuthenticated, user, isSyncing, signOut } = useGoogleAuth();
+  const { isAuthenticated, user, isSyncing, syncStatus, isOnline, signOut } = useGoogleAuth();
 
   const handleMenuClose = () => {
     setIsMenuOpen(false);
@@ -40,17 +40,30 @@ export default function Header({ onConfigClick }: HeaderProps) {
                     />
                   )}
                   
-                  {/* Sync Status */}
+                  {/* Sync Status Indicator */}
                   <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 rounded-lg">
-                    {isSyncing ? (
-                      <>
-                        <Cloud size={16} className="text-blue-600 animate-pulse" />
-                        <span className="text-xs text-gray-600">Sincronizando...</span>
-                      </>
-                    ) : (
+                    {syncStatus === 'synced' && (
                       <>
                         <Cloud size={16} className="text-green-600" />
                         <span className="text-xs text-gray-600">Sincronizado</span>
+                      </>
+                    )}
+                    {syncStatus === 'pending' && (
+                      <>
+                        <Cloud size={16} className="text-yellow-600 animate-pulse" />
+                        <span className="text-xs text-gray-600">Pendiente de subir</span>
+                      </>
+                    )}
+                    {syncStatus === 'error' && (
+                      <>
+                        <AlertCircle size={16} className="text-red-600" />
+                        <span className="text-xs text-gray-600">Error de conexión</span>
+                      </>
+                    )}
+                    {syncStatus === 'offline' && (
+                      <>
+                        <Wifi size={16} className="text-gray-400" />
+                        <span className="text-xs text-gray-600">Sin conexión</span>
                       </>
                     )}
                   </div>

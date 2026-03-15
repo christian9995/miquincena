@@ -10,6 +10,7 @@ import { resolveSyncConflict } from '@/lib/sync-manager';
 const STORAGE_KEY_TRANSACTIONS = 'finanzas_v2026';
 const STORAGE_KEY_BUDGETS = 'presupuestos_v2026';
 const STORAGE_KEY_SEED_DATE = 'fecha_semilla_2026';
+const STORAGE_KEY_SYNC_QUEUE = 'google_sync_queue_v2026';
 const SYNC_DEBOUNCE_MS = 3000;
 
 export function useFinance() {
@@ -19,15 +20,40 @@ export function useFinance() {
     const [isInitialized, setIsInitialized] = useState(false);
     const [seedDate, setSeedDate] = useState('2026-01-02');
     
-    const { isAuthenticated, accessToken, updateSyncStatus } = useGoogleAuth();
+    const { isAuthenticated, accessToken, updateSyncStatus, triggerPendingSync, isOnline } = useGoogleAuth();
     const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Load data from localStorage on mount
+    // Load data from localStorage on mount (Offline-First)
     useEffect(() => {
         const initializeApp = async () => {
             try {
-                // For now, always load from localStorage (Google Drive auth not ready)
+                // Always load from localStorage first (Offline-First)
                 loadFromLocalStorage();
+                
+                // Then attempt Google Drive sync if authenticated and online
+                if (isAuthenticated && accessToken && isOnline) {
+                    console.log('[v0] Attempting to load from Google Drive');
+                    try {
+                        const driveData = await loadAppStateFromDrive(accessToken);
+                        if (driveData) {
+                            const localState = {
+                                transactions: JSON.parse(localStorage.getItem(STORAGE_KEY_TRANSACTIONS) || '[]'),
+                                budgets: JSON.parse(localStorage.getItem(STORAGE_KEY_BUDGETS) || '{}'),
+                                seedDate: localStorage.getItem(STORAGE_KEY_SEED_DATE) || '2026-01-02',
+                                timestamp: 0,
+                            };
+                            
+                            const merged = resolveSyncConflict(localState, driveData);
+                            setTransactions(merged.transactions);
+                            setBudgets(merged.budgets);
+                            setSeedDate(merged.seedDate);
+                            updateSyncStatus(false, 'synced');
+                        }
+                    } catch (driveErr) {
+                        console.log('[v0] Google Drive not available, using localStorage');
+                        updateSyncStatus(false, 'pending');
+                    }
+                }
             } catch (err) {
                 console.error('[v0] Error initializing app:', err);
                 loadFromLocalStorage();
@@ -63,18 +89,58 @@ export function useFinance() {
         initializeApp().finally(() => {
             setIsInitialized(true);
         });
-    }, []);
+    }, [isAuthenticated, accessToken, isOnline, updateSyncStatus]);
 
-    // Auto-sync to Google Drive when data changes (disabled for now - auth not ready)
+    // Always save to localStorage immediately (Offline-First)
+    // Queue sync to Google Drive when data changes
     useEffect(() => {
-        // Sync disabled until OAuth authentication is properly configured
         if (!isInitialized) return;
 
-        // Always save to localStorage as fallback
+        // ALWAYS save to localStorage first
         localStorage.setItem(STORAGE_KEY_TRANSACTIONS, JSON.stringify(transactions));
         localStorage.setItem(STORAGE_KEY_BUDGETS, JSON.stringify(budgets));
         localStorage.setItem(STORAGE_KEY_SEED_DATE, seedDate);
-    }, [transactions, budgets, seedDate, isInitialized]);
+        
+        console.log('[v0] Data saved to localStorage');
+
+        // If authenticated and online, queue sync to Drive
+        if (isAuthenticated && accessToken && isOnline) {
+            console.log('[v0] Queuing Drive sync');
+            updateSyncStatus(true);
+
+            if (syncTimeoutRef.current) {
+                clearTimeout(syncTimeoutRef.current);
+            }
+
+            syncTimeoutRef.current = setTimeout(async () => {
+                try {
+                    updateSyncStatus(true);
+                    console.log('[v0] Starting Drive sync');
+                    await saveAppStateToDrive(accessToken, {
+                        transactions,
+                        budgets,
+                        seedDate,
+                        timestamp: Date.now(),
+                    });
+                    updateSyncStatus(false, 'synced');
+                    console.log('[v0] Drive sync completed successfully');
+                } catch (err) {
+                    console.error('[v0] Error syncing to Drive:', err);
+                    updateSyncStatus(false, 'error');
+                }
+            }, SYNC_DEBOUNCE_MS);
+        } else if (!isOnline && isAuthenticated) {
+            // Mark as pending sync when offline
+            console.log('[v0] Offline: marking data as pending sync');
+            updateSyncStatus(false, 'pending');
+        }
+
+        return () => {
+            if (syncTimeoutRef.current) {
+                clearTimeout(syncTimeoutRef.current);
+            }
+        };
+    }, [transactions, budgets, seedDate, isInitialized, isAuthenticated, accessToken, isOnline, updateSyncStatus]);
 
     const currentPeriodData = useMemo(() => {
         const { start, end } = getPeriodDates(currentPeriodIndex, seedDate);

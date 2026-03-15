@@ -8,11 +8,15 @@ interface GoogleAuthContextType {
   user: { email: string; name: string; picture?: string } | null;
   accessToken: string | null;
   isSyncing: boolean;
+  syncStatus: 'synced' | 'pending' | 'error' | 'offline';
   lastSyncTime: number | null;
+  isOnline: boolean;
+  hasPendingSync: boolean;
   signIn: (credentialResponse: any) => Promise<void>;
   signOut: () => Promise<void>;
   error: string | null;
-  updateSyncStatus: (isSyncing: boolean) => void;
+  updateSyncStatus: (isSyncing: boolean, status?: 'synced' | 'pending' | 'error') => void;
+  triggerPendingSync: () => Promise<void>;
 }
 
 const GoogleAuthContext = createContext<GoogleAuthContextType | undefined>(undefined);
@@ -24,7 +28,34 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<'synced' | 'pending' | 'error' | 'offline'>('offline');
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const [hasPendingSync, setHasPendingSync] = useState(false);
+
+  // Monitor online/offline status
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log('[v0] Connection restored');
+      setIsOnline(true);
+      setSyncStatus('pending');
+      setHasPendingSync(true);
+    };
+
+    const handleOffline = () => {
+      console.log('[v0] Connection lost');
+      setIsOnline(false);
+      setSyncStatus('offline');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Check if user is already authenticated on mount
   useEffect(() => {
@@ -33,6 +64,7 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const storedToken = localStorage.getItem('google_access_token');
         const storedUser = localStorage.getItem('google_user');
         const storedSyncTime = localStorage.getItem('google_last_sync');
+        const pendingSync = localStorage.getItem('google_pending_sync');
         
         if (storedToken && storedUser) {
           setAccessToken(storedToken);
@@ -40,6 +72,12 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           setIsAuthenticated(true);
           if (storedSyncTime) {
             setLastSyncTime(parseInt(storedSyncTime));
+          }
+          if (pendingSync === 'true') {
+            setHasPendingSync(true);
+            setSyncStatus('pending');
+          } else {
+            setSyncStatus('synced');
           }
         }
       } catch (err) {
@@ -117,13 +155,31 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   }, []);
 
-  const updateSyncStatus = useCallback((syncing: boolean) => {
+  const updateSyncStatus = useCallback((syncing: boolean, status?: 'synced' | 'pending' | 'error') => {
     setIsSyncing(syncing);
+    
     if (!syncing) {
-      const now = Date.now();
-      setLastSyncTime(now);
-      localStorage.setItem('google_last_sync', now.toString());
+      const newStatus = status || (isOnline ? 'synced' : 'pending');
+      setSyncStatus(newStatus);
+      
+      if (newStatus === 'synced') {
+        const now = Date.now();
+        setLastSyncTime(now);
+        localStorage.setItem('google_last_sync', now.toString());
+        localStorage.setItem('google_pending_sync', 'false');
+        setHasPendingSync(false);
+      } else if (newStatus === 'pending') {
+        localStorage.setItem('google_pending_sync', 'true');
+        setHasPendingSync(true);
+      }
     }
+  }, [isOnline]);
+
+  const triggerPendingSync = useCallback(async () => {
+    console.log('[v0] Triggering pending sync');
+    // This will be called by useFinance when connection is restored
+    // The actual sync logic is handled by the sync manager
+    setHasPendingSync(false);
   }, []);
 
   return (
@@ -137,8 +193,12 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         signOut,
         error,
         isSyncing,
+        syncStatus,
         lastSyncTime,
+        isOnline,
+        hasPendingSync,
         updateSyncStatus,
+        triggerPendingSync,
       }}
     >
       {children}
