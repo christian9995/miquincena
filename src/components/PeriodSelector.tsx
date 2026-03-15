@@ -1,6 +1,6 @@
 'use client';
 
-import { getPeriodDates, formatDateShort } from '@/lib/finance-utils';
+import { getAllPeriods, formatDateShort } from '@/lib/finance-utils';
 
 interface PeriodSelectorProps {
     currentIndex: number;
@@ -9,8 +9,11 @@ interface PeriodSelectorProps {
 }
 
 export default function PeriodSelector({ currentIndex, onChange, seedDate }: PeriodSelectorProps) {
-    const { start, end } = getPeriodDates(currentIndex, seedDate);
+    const allPeriods = getAllPeriods(seedDate);
+    const currentPeriod = allPeriods[currentIndex];
+    const { start, end } = currentPeriod || { start: new Date(), end: new Date() };
     const today = new Date();
+    const lastIndex = allPeriods.length - 1;
 
     return (
         <header className="bg-blue-600 text-white flex justify-between items-center p-4 rounded-xl mb-6 shadow-md">
@@ -30,12 +33,11 @@ export default function PeriodSelector({ currentIndex, onChange, seedDate }: Per
                         onChange={(e) => onChange(parseInt(e.target.value))}
                         className="bg-white/20 text-white font-bold text-lg p-1 rounded-md border border-white/40 cursor-pointer outline-none mb-1"
                     >
-                        {Array.from({ length: 26 }).map((_, i) => {
-                            const { start: s, end: e } = getPeriodDates(i, seedDate);
-                            const isCurrent = today >= s && today <= e;
+                        {allPeriods.map((period, i) => {
+                            const isCurrent = today >= period.start && today <= period.end;
                             return (
                                 <option key={i} value={i} className="text-gray-800">
-                                    Q{i + 1}: {formatDateShort(s)} {isCurrent ? '(Hoy)' : ''}
+                                    Q{i + 1}: {formatDateShort(period.start)} {isCurrent ? '(Hoy)' : ''}
                                 </option>
                             );
                         })}
@@ -47,9 +49,9 @@ export default function PeriodSelector({ currentIndex, onChange, seedDate }: Per
             </div>
 
             <button
-                onClick={() => onChange(Math.min(25, currentIndex + 1))}
+                onClick={() => onChange(Math.min(lastIndex, currentIndex + 1))}
                 className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
-                disabled={currentIndex === 25}
+                disabled={currentIndex === lastIndex}
             >
                 Sig. ▶
             </button>

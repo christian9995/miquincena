@@ -3,33 +3,33 @@ export const END_DATE_2026 = new Date('2026-12-31T23:59:59');
 export const DEFAULT_SEED_DATE = '2026-01-02';
 
 /**
- * Calculate the first period start date (Period 0) using the anchor date.
- * 
- * The seed date serves as a fixed reference point. We calculate backwards from it
- * in 14-day increments to determine the day-of-cycle, then calculate where Period 0
- * should start within January 2026.
- * 
- * This ensures exactly 26 consecutive 14-day periods are generated, with the first
- * period starting on or near January 1st, 2026, and the 26th period ending on or before
- * December 31st, 2026 (or naturally extending into early January if needed).
+ * Infinite Anchor System:
+ * The seed date is treated as the START of a fortnight (day 1 of a 14-day period).
+ * We calculate backwards in 14-day increments to find the first period that starts
+ * within the year 2026 (closest to January 1st). This becomes 'Period 1'.
+ * Then we generate forward consecutive 14-day periods.
  */
 function getFirstPeriodStart(seedDate?: string): Date {
-    // Use seed date or default as the anchor reference point
+    // Use seed date or default as the anchor - it MUST be the start of a fortnight
     const anchorDate = seedDate ? new Date(seedDate + 'T00:00:00') : new Date(DEFAULT_SEED_DATE + 'T00:00:00');
     
-    // Calculate days elapsed from Jan 1, 2026 to the anchor date
-    const daysSinceJan1 = Math.floor((anchorDate.getTime() - START_DATE_2026.getTime()) / (1000 * 60 * 60 * 24));
+    // Calculate backwards from anchor in 14-day increments until we find the first period in 2026
+    let periodStart = new Date(anchorDate);
     
-    // Calculate which 14-day period the anchor date falls into (0-indexed)
-    // This tells us the "phase" of the cycle at the anchor point
-    const periodOffset = daysSinceJan1 % 14;
+    // Keep going back 14 days at a time until start date is in 2026 or earlier
+    while (periodStart > START_DATE_2026) {
+        const testDate = new Date(periodStart);
+        testDate.setDate(testDate.getDate() - 14);
+        
+        // If going back another 14 days would take us before Jan 1, 2026, stop
+        if (testDate < START_DATE_2026) {
+            break;
+        }
+        
+        periodStart = testDate;
+    }
     
-    // Period 0 starts when we go back from Jan 1 by periodOffset days
-    // This aligns the entire 26-period cycle with the anchor's phase
-    const firstPeriodStart = new Date(START_DATE_2026);
-    firstPeriodStart.setDate(firstPeriodStart.getDate() - periodOffset);
-    
-    return firstPeriodStart;
+    return periodStart;
 }
 
 export function getPeriodDates(index: number, seedDate?: string) {
@@ -48,30 +48,46 @@ export function getPeriodDates(index: number, seedDate?: string) {
 }
 
 export function getCurrentPeriodIndex(date: Date = new Date(), seedDate?: string): number {
-    // Get the first period start date (Period 0)
-    const firstPeriodStart = getFirstPeriodStart(seedDate);
+    // Get all valid periods for 2026
+    const allPeriods = getAllPeriods(seedDate);
     
-    // Calculate which period the given date falls into
-    const diffTime = date.getTime() - firstPeriodStart.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    const periodIndex = Math.floor(diffDays / 14);
+    // Find which period contains the given date
+    for (let i = 0; i < allPeriods.length; i++) {
+        const period = allPeriods[i];
+        if (date >= period.start && date <= period.end) {
+            return i;
+        }
+    }
     
-    // Constrain to valid range (0-25 for 26 periods)
-    // If the date is before Period 0, return 0
-    // If the date is after Period 25 ends, return 25
-    return Math.max(0, Math.min(25, periodIndex));
+    // If date is before the first period, return 0
+    if (date < allPeriods[0].start) {
+        return 0;
+    }
+    
+    // If date is after the last period, return last index
+    return allPeriods.length - 1;
 }
 
 /**
- * Generate all 26 periods for the 2026 calendar based on the seed date anchor.
- * Returns an array of 26 period objects with start and end dates.
+ * Generate all periods for 2026 based on the seed date anchor.
+ * Only includes periods whose start date falls within 2026.
+ * Returns an array of period objects with start and end dates.
  */
 export function getAllPeriods(seedDate?: string): Array<{ start: Date; end: Date; index: number }> {
     const periods: Array<{ start: Date; end: Date; index: number }> = [];
+    let index = 0;
     
-    for (let i = 0; i < 26; i++) {
-        const { start, end } = getPeriodDates(i, seedDate);
-        periods.push({ start, end, index: i });
+    // Generate periods until the start date goes beyond 2026
+    while (true) {
+        const { start, end } = getPeriodDates(index, seedDate);
+        
+        // If period starts after Dec 31, 2026, stop
+        if (start > END_DATE_2026) {
+            break;
+        }
+        
+        periods.push({ start, end, index: periods.length });
+        index++;
     }
     
     return periods;
