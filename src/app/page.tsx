@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useFinance } from '@/hooks/useFinance';
+import Header from '@/components/Header';
 import PeriodSelector from '@/components/PeriodSelector';
 import TransactionForm from '@/components/TransactionForm';
 import SummaryPanel from '@/components/SummaryPanel';
@@ -56,14 +57,15 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-[#f8f9fc] p-4 md:p-8">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-800 mb-6">Mi Quincena</h1>
-        <PeriodSelector
-          currentIndex={currentPeriodIndex}
-          onChange={setCurrentPeriodIndex}
-          seedDate={seedDate}
-        />
+    <>
+      <Header />
+      <main className="min-h-screen bg-[#f8f9fc] p-4 md:p-8">
+        <div className="max-w-7xl mx-auto">
+          <PeriodSelector
+            currentIndex={currentPeriodIndex}
+            onChange={setCurrentPeriodIndex}
+            seedDate={seedDate}
+          />
 
         <div className="flex flex-col lg:flex-row gap-8">
           <div className="flex-1 space-y-6">
@@ -177,7 +179,8 @@ export default function Home() {
             </button>
           </div>
         </div>
-      </div>
-    </main>
+        </div>
+      </main>
+    </>
   );
 }
