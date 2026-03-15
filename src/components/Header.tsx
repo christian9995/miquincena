@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Menu, X, LogOut, Cloud, AlertCircle, Wifi } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Menu, X, LogOut, Cloud, AlertCircle, Wifi, CheckCircle } from 'lucide-react';
 import { useGoogleAuth } from '@/context/GoogleAuthContext';
 import GoogleSignIn from './GoogleSignIn';
 
@@ -12,7 +12,17 @@ interface HeaderProps {
 export default function Header({ onConfigClick }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<'about' | 'guide' | null>(null);
+  const [showSuccessNotification, setShowSuccessNotification] = useState(false);
   const { isAuthenticated, user, isSyncing, syncStatus, isOnline, signOut } = useGoogleAuth();
+
+  // Show success notification when first synced
+  useEffect(() => {
+    if (isAuthenticated && syncStatus === 'synced' && !showSuccessNotification) {
+      setShowSuccessNotification(true);
+      const timer = setTimeout(() => setShowSuccessNotification(false), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [isAuthenticated, syncStatus, showSuccessNotification]);
 
   const handleMenuClose = () => {
     setIsMenuOpen(false);
@@ -20,6 +30,14 @@ export default function Header({ onConfigClick }: HeaderProps) {
 
   return (
     <>
+      {/* Success Notification */}
+      {showSuccessNotification && (
+        <div className="bg-green-50 border-b border-green-200 px-4 md:px-8 py-3 flex items-center gap-2 text-green-700 text-sm">
+          <CheckCircle size={18} />
+          <span>Conectado a Google Drive - Datos protegidos</span>
+        </div>
+      )}
+
       {/* Header */}
       <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 md:px-8 py-4 flex items-center justify-between">

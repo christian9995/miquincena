@@ -95,41 +95,6 @@ async function findOrCreateFile(accessToken: string): Promise<string> {
 }
 
 /**
- * Save app state to Google Drive
- */
-export async function saveAppStateToDrive(
-  accessToken: string,
-  appState: AppState
-): Promise<void> {
-  try {
-    const fileId = await findOrCreateFile(accessToken);
-
-    const content = JSON.stringify(appState);
-
-    const response = await fetch(
-      `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
-      {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: content,
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Save failed: ${response.statusText}`);
-    }
-
-    console.log('[v0] App state saved to Google Drive');
-  } catch (err) {
-    console.error('[v0] Error saving app state to Drive:', err);
-    throw err;
-  }
-}
-
-/**
  * Load app state from Google Drive
  */
 export async function loadAppStateFromDrive(accessToken: string): Promise<AppState | null> {
@@ -183,31 +148,54 @@ export async function loadAppStateFromDrive(accessToken: string): Promise<AppSta
     return null;
   }
 }
-        budgets: {},
-        seedDate: '2026-01-02',
-        timestamp: Date.now(),
-      };
-    }
 
-    const fileId = searchData.files[0].id;
+/**
+ * Save app state to Google Drive
+ */
+export async function saveAppStateToDrive(
+  accessToken: string,
+  appState: AppState
+): Promise<void> {
+  try {
+    console.log('[v0] Saving app state to Google Drive');
 
-    // Download the file content
-    const contentResponse = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+    // Find or create the file
+    const fileId = await findOrCreateFile(accessToken);
+
+    // Update the file with new data
+    const metadata = {
+      name: FILE_NAME,
+      mimeType: 'application/json',
+    };
+
+    const formData = new FormData();
+    formData.append(
+      'metadata',
+      new Blob([JSON.stringify(metadata)], { type: 'application/json' })
+    );
+    formData.append(
+      'file',
+      new Blob([JSON.stringify(appState)], { type: 'application/json' })
+    );
+
+    const updateResponse = await fetch(
+      `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`,
       {
+        method: 'PATCH',
         headers: { Authorization: `Bearer ${accessToken}` },
+        body: formData,
       }
     );
 
-    if (!contentResponse.ok) {
-      throw new Error(`Download failed: ${contentResponse.statusText}`);
+    if (!updateResponse.ok) {
+      const errorText = await updateResponse.text();
+      console.error('[v0] Drive Update Error:', updateResponse.status, updateResponse.statusText, errorText);
+      throw new Error(`Update failed with status ${updateResponse.status}: ${updateResponse.statusText}`);
     }
 
-    const appState = await contentResponse.json() as AppState;
-    console.log('[v0] App state loaded from Google Drive');
-    return appState;
+    console.log('[v0] Successfully saved app state to Google Drive');
   } catch (err) {
-    console.error('[v0] Error loading app state from Drive:', err);
-    return null;
+    console.error('[v0] Error saving app state to Drive:', err);
+    throw err;
   }
 }

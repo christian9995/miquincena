@@ -89,38 +89,79 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     checkAuth();
   }, []);
 
-  const signIn = useCallback(async (credentialResponse: any) => {
+  const signIn = useCallback(async (tokenResponse: any) => {
     setIsLoading(true);
     setError(null);
     
     try {
-      // Decode JWT to get user info
-      const base64Url = credentialResponse.credential.split('.')[1];
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const jsonPayload = decodeURIComponent(
-        atob(base64)
-          .split('')
-          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-          .join('')
-      );
+      // Handle OAuth2 token response (has access_token)
+      if (tokenResponse.access_token) {
+        console.log('[v0] Processing OAuth2 access token');
+        
+        setAccessToken(tokenResponse.access_token);
+        setIsAuthenticated(true);
+        
+        // Try to fetch user info from Google userinfo endpoint
+        try {
+          const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v1/userinfo', {
+            headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+          });
+          
+          if (userInfoResponse.ok) {
+            const userInfo = await userInfoResponse.json();
+            setUser({
+              email: userInfo.email,
+              name: userInfo.name,
+              picture: userInfo.picture,
+            });
+            
+            localStorage.setItem('google_access_token', tokenResponse.access_token);
+            localStorage.setItem('google_user', JSON.stringify({
+              email: userInfo.email,
+              name: userInfo.name,
+              picture: userInfo.picture,
+            }));
+            
+            // Show success message
+            console.log('[v0] Conectado a Google Drive - Datos protegidos');
+            setSyncStatus('synced');
+          }
+        } catch (userErr) {
+          console.log('[v0] Could not fetch user info:', userErr);
+          // Still authenticated, just without user details
+          setUser({ email: 'usuario@gmail.com', name: 'Usuario' });
+        }
+      } else if (tokenResponse.credential) {
+        // Handle legacy GSI identity token
+        console.log('[v0] Processing GSI identity token');
+        
+        const base64Url = tokenResponse.credential.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(
+          atob(base64)
+            .split('')
+            .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+            .join('')
+        );
+        
+        const decoded = JSON.parse(jsonPayload);
+        
+        localStorage.setItem('google_access_token', tokenResponse.credential);
+        localStorage.setItem('google_user', JSON.stringify({
+          email: decoded.email,
+          name: decoded.name,
+          picture: decoded.picture,
+        }));
+        
+        setAccessToken(tokenResponse.credential);
+        setUser({
+          email: decoded.email,
+          name: decoded.name,
+          picture: decoded.picture,
+        });
+        setIsAuthenticated(true);
+      }
       
-      const decoded = JSON.parse(jsonPayload);
-      
-      // Store tokens and user info
-      localStorage.setItem('google_access_token', credentialResponse.credential);
-      localStorage.setItem('google_user', JSON.stringify({
-        email: decoded.email,
-        name: decoded.name,
-        picture: decoded.picture,
-      }));
-      
-      setAccessToken(credentialResponse.credential);
-      setUser({
-        email: decoded.email,
-        name: decoded.name,
-        picture: decoded.picture,
-      });
-      setIsAuthenticated(true);
       setError(null);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Authentication failed';
