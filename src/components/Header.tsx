@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, LogOut, Cloud, CloudOff } from 'lucide-react';
+import { useGoogleAuth } from '@/context/GoogleAuthContext';
+import GoogleSignIn from './GoogleSignIn';
 
 interface HeaderProps {
   onConfigClick?: () => void;
@@ -10,6 +12,7 @@ interface HeaderProps {
 export default function Header({ onConfigClick }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<'about' | 'guide' | null>(null);
+  const { isAuthenticated, user, isSyncing, signOut } = useGoogleAuth();
 
   const handleMenuClose = () => {
     setIsMenuOpen(false);
@@ -22,18 +25,63 @@ export default function Header({ onConfigClick }: HeaderProps) {
         <div className="max-w-7xl mx-auto px-4 md:px-8 py-4 flex items-center justify-between">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Mi Quincena</h1>
           
-          {/* Hamburger Menu Button */}
-          <button
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            aria-label="Toggle menu"
-          >
-            {isMenuOpen ? (
-              <X size={24} className="text-gray-800" />
-            ) : (
-              <Menu size={24} className="text-gray-800" />
-            )}
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Sync Status and Google Sign-In */}
+            <div className="flex items-center gap-2">
+              {isAuthenticated && user ? (
+                <div className="flex items-center gap-2">
+                  {/* Profile Picture */}
+                  {user.picture && (
+                    <img
+                      src={user.picture}
+                      alt={user.name}
+                      className="w-8 h-8 rounded-full"
+                      title={user.email}
+                    />
+                  )}
+                  
+                  {/* Sync Status */}
+                  <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 rounded-lg">
+                    {isSyncing ? (
+                      <>
+                        <Cloud size={16} className="text-blue-600 animate-pulse" />
+                        <span className="text-xs text-gray-600">Sincronizando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Cloud size={16} className="text-green-600" />
+                        <span className="text-xs text-gray-600">Sincronizado</span>
+                      </>
+                    )}
+                  </div>
+                  
+                  {/* Sign Out Button */}
+                  <button
+                    onClick={() => signOut()}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    title="Cerrar sesión"
+                  >
+                    <LogOut size={18} className="text-gray-600" />
+                  </button>
+                </div>
+              ) : (
+                <GoogleSignIn />
+              )}
+            </div>
+            
+            {/* Hamburger Menu Button */}
+            <button
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              aria-label="Toggle menu"
+            >
+              {isMenuOpen ? (
+                <X size={24} className="text-gray-800" />
+              ) : (
+                <Menu size={24} className="text-gray-800" />
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Mobile Menu */}
