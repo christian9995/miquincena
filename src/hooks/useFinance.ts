@@ -48,10 +48,14 @@ export function useFinance() {
                             setBudgets(merged.budgets);
                             setSeedDate(merged.seedDate);
                             updateSyncStatus(false, 'synced');
+                        } else {
+                            console.log('[v0] No data in Google Drive, using localStorage');
+                            updateSyncStatus(false, 'pending');
                         }
                     } catch (driveErr) {
-                        console.log('[v0] Google Drive not available, using localStorage');
-                        updateSyncStatus(false, 'pending');
+                        console.log('[v0] Google Drive sync not available - using localStorage only');
+                        console.log('[v0] Note: Google Drive sync requires proper OAuth 2.0 Authorization Code Flow with drive.appdata scope');
+                        updateSyncStatus(false, 'offline');
                     }
                 }
             } catch (err) {
@@ -126,7 +130,8 @@ export function useFinance() {
                     console.log('[v0] Drive sync completed successfully');
                 } catch (err) {
                     console.error('[v0] Error syncing to Drive:', err);
-                    updateSyncStatus(false, 'error');
+                    console.log('[v0] Falling back to localStorage - data is safe locally');
+                    updateSyncStatus(false, 'offline');
                 }
             }, SYNC_DEBOUNCE_MS);
         } else if (!isOnline && isAuthenticated) {

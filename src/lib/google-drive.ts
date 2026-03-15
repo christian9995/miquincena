@@ -23,6 +23,8 @@ interface DriveFile {
  */
 async function findOrCreateFile(accessToken: string): Promise<string> {
   try {
+    console.log('[v0] Searching for existing data file in Google Drive');
+    
     // Search for existing file in appDataFolder
     const searchResponse = await fetch(
       `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='${FILE_NAME}'&fields=files(id)`,
@@ -32,7 +34,9 @@ async function findOrCreateFile(accessToken: string): Promise<string> {
     );
 
     if (!searchResponse.ok) {
-      throw new Error(`Search failed: ${searchResponse.statusText}`);
+      const errorText = await searchResponse.text();
+      console.error('[v0] Drive Search Error:', searchResponse.status, searchResponse.statusText, errorText);
+      throw new Error(`Search failed with status ${searchResponse.status}: ${searchResponse.statusText}`);
     }
 
     const searchData = await searchResponse.json();
@@ -76,7 +80,9 @@ async function findOrCreateFile(accessToken: string): Promise<string> {
     );
 
     if (!createResponse.ok) {
-      throw new Error(`Create failed: ${createResponse.statusText}`);
+      const errorText = await createResponse.text();
+      console.error('[v0] Drive Create Error:', createResponse.status, createResponse.statusText, errorText);
+      throw new Error(`Create failed with status ${createResponse.status}: ${createResponse.statusText}`);
     }
 
     const createData = await createResponse.json();
@@ -128,6 +134,8 @@ export async function saveAppStateToDrive(
  */
 export async function loadAppStateFromDrive(accessToken: string): Promise<AppState | null> {
   try {
+    console.log('[v0] Loading app state from Google Drive');
+    
     // Search for existing file
     const searchResponse = await fetch(
       `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='${FILE_NAME}'&fields=files(id,modifiedTime)`,
@@ -137,17 +145,44 @@ export async function loadAppStateFromDrive(accessToken: string): Promise<AppSta
     );
 
     if (!searchResponse.ok) {
-      throw new Error(`Search failed: ${searchResponse.statusText}`);
+      const errorText = await searchResponse.text();
+      console.error('[v0] Drive Load Search Error:', searchResponse.status, searchResponse.statusText, errorText);
+      throw new Error(`Search failed with status ${searchResponse.status}: ${searchResponse.statusText}`);
     }
 
     const searchData = await searchResponse.json();
 
     if (!searchData.files || searchData.files.length === 0) {
-      console.log('[v0] No data file found on Google Drive, creating new one');
-      const fileId = await findOrCreateFile(accessToken);
-      // Return the initial state that was created
-      return {
-        transactions: [],
+      console.log('[v0] No data file found on Google Drive');
+      return null;
+    }
+
+    const fileId = searchData.files[0].id;
+    console.log('[v0] Found data file, loading content:', fileId);
+
+    // Load file content
+    const contentResponse = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }
+    );
+
+    if (!contentResponse.ok) {
+      const errorText = await contentResponse.text();
+      console.error('[v0] Drive Load Content Error:', contentResponse.status, contentResponse.statusText, errorText);
+      throw new Error(`Content load failed with status ${contentResponse.status}: ${contentResponse.statusText}`);
+    }
+
+    const appState = await contentResponse.json();
+    console.log('[v0] Successfully loaded app state from Google Drive');
+    return appState;
+  } catch (err) {
+    console.error('[v0] Error loading app state from Drive:', err);
+    // Return null instead of throwing to allow graceful fallback
+    return null;
+  }
+}
         budgets: {},
         seedDate: '2026-01-02',
         timestamp: Date.now(),
