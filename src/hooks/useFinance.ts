@@ -22,34 +22,12 @@ export function useFinance() {
     const { isAuthenticated, accessToken, updateSyncStatus } = useGoogleAuth();
     const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Load data from localStorage or Google Drive on mount
+    // Load data from localStorage on mount
     useEffect(() => {
         const initializeApp = async () => {
             try {
-                // Try to load from Google Drive if authenticated
-                if (isAuthenticated && accessToken) {
-                    const driveData = await loadAppStateFromDrive(accessToken);
-                    if (driveData) {
-                        const localState = {
-                            transactions: JSON.parse(localStorage.getItem(STORAGE_KEY_TRANSACTIONS) || '[]'),
-                            budgets: JSON.parse(localStorage.getItem(STORAGE_KEY_BUDGETS) || '{}'),
-                            seedDate: localStorage.getItem(STORAGE_KEY_SEED_DATE) || '2026-01-02',
-                            timestamp: 0,
-                        };
-                        
-                        // Resolve conflicts using most recent version
-                        const merged = resolveSyncConflict(localState, driveData);
-                        setTransactions(merged.transactions);
-                        setBudgets(merged.budgets);
-                        setSeedDate(merged.seedDate);
-                    } else {
-                        // Fall back to localStorage
-                        loadFromLocalStorage();
-                    }
-                } else {
-                    // Load from localStorage if not authenticated
-                    loadFromLocalStorage();
-                }
+                // For now, always load from localStorage (Google Drive auth not ready)
+                loadFromLocalStorage();
             } catch (err) {
                 console.error('[v0] Error initializing app:', err);
                 loadFromLocalStorage();
@@ -85,56 +63,17 @@ export function useFinance() {
         initializeApp().finally(() => {
             setIsInitialized(true);
         });
-    }, [isAuthenticated, accessToken]);
+    }, []);
 
-    // Auto-sync to Google Drive when data changes
+    // Auto-sync to Google Drive when data changes (disabled for now - auth not ready)
     useEffect(() => {
-        if (!isInitialized || !isAuthenticated || !accessToken) return;
+        // Sync disabled until OAuth authentication is properly configured
+        if (!isInitialized) return;
 
-        // Clear existing timeout
-        if (syncTimeoutRef.current) {
-            clearTimeout(syncTimeoutRef.current);
-        }
-
-        // Debounce sync
-        syncTimeoutRef.current = setTimeout(async () => {
-            try {
-                updateSyncStatus(true);
-                await saveAppStateToDrive(accessToken, {
-                    transactions,
-                    budgets,
-                    seedDate,
-                    timestamp: Date.now(),
-                });
-                updateSyncStatus(false);
-            } catch (err) {
-                console.error('[v0] Error syncing to Drive:', err);
-                updateSyncStatus(false);
-            }
-        }, SYNC_DEBOUNCE_MS);
-
-        return () => {
-            if (syncTimeoutRef.current) {
-                clearTimeout(syncTimeoutRef.current);
-            }
-        };
-    }, [transactions, budgets, seedDate, isInitialized, isAuthenticated, accessToken, updateSyncStatus]);
-
-    // Update current period index when seed date changes
-    useEffect(() => {
-        if (isInitialized) {
-            const newPeriodIndex = getCurrentPeriodIndex(new Date(), seedDate);
-            setCurrentPeriodIndex(newPeriodIndex);
-        }
-    }, [seedDate, isInitialized]);
-
-    // Save data to localStorage (always, as fallback)
-    useEffect(() => {
-        if (isInitialized) {
-            localStorage.setItem(STORAGE_KEY_TRANSACTIONS, JSON.stringify(transactions));
-            localStorage.setItem(STORAGE_KEY_BUDGETS, JSON.stringify(budgets));
-            localStorage.setItem(STORAGE_KEY_SEED_DATE, seedDate);
-        }
+        // Always save to localStorage as fallback
+        localStorage.setItem(STORAGE_KEY_TRANSACTIONS, JSON.stringify(transactions));
+        localStorage.setItem(STORAGE_KEY_BUDGETS, JSON.stringify(budgets));
+        localStorage.setItem(STORAGE_KEY_SEED_DATE, seedDate);
     }, [transactions, budgets, seedDate, isInitialized]);
 
     const currentPeriodData = useMemo(() => {
