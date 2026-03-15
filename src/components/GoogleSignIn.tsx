@@ -10,17 +10,27 @@ declare global {
   }
 }
 
-const GOOGLE_CLIENT_ID = '354861954564-mthf9cjuqpledsk665gmeedpb1u3qpb5.apps.googleusercontent.com';
+// Use environment variable if available, otherwise use fallback
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '354861954564-mthf9cjuqpledsk665gmeedpb1u3qpb5.apps.googleusercontent.com';
 const ALLOWED_PARENT_ORIGIN = 'https://www.miquincena.com';
 
 export default function GoogleSignIn() {
   const { signIn } = useGoogleAuth();
   const tokenClientRef = useRef<any>(null);
   const [isReady, setIsReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Initialize OAuth2 TokenClient for drive.appdata access
   useEffect(() => {
     if (typeof window === 'undefined') {
+      return;
+    }
+
+    // Validate client ID
+    if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID === 'undefined') {
+      console.warn('[v0] NEXT_PUBLIC_GOOGLE_CLIENT_ID not configured. Google Drive sync will be unavailable.');
+      setError('Google authentication not configured');
+      setIsReady(false);
       return;
     }
 
@@ -148,9 +158,13 @@ export default function GoogleSignIn() {
   if (!isReady) {
     return (
       <div className="flex items-center">
-        <button disabled className="px-4 py-2 text-gray-400 cursor-not-allowed">
-          Cargando...
-        </button>
+        {error ? (
+          <span className="text-xs text-gray-400 opacity-60">Auth. no disponible</span>
+        ) : (
+          <button disabled className="px-4 py-2 text-gray-400 cursor-not-allowed">
+            Cargando...
+          </button>
+        )}
       </div>
     );
   }

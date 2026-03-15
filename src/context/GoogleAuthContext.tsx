@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import type { GoogleAuthResponse } from '@/types';
 
 interface GoogleAuthContextType {
   isAuthenticated: boolean;
@@ -12,7 +13,7 @@ interface GoogleAuthContextType {
   lastSyncTime: number | null;
   isOnline: boolean;
   hasPendingSync: boolean;
-  signIn: (credentialResponse: any) => Promise<void>;
+  signIn: (response: GoogleAuthResponse) => Promise<void>;
   signOut: () => Promise<void>;
   error: string | null;
   updateSyncStatus: (isSyncing: boolean, status?: 'synced' | 'pending' | 'error') => void;
@@ -89,15 +90,15 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     checkAuth();
   }, []);
 
-  const signIn = useCallback(async (tokenResponse: any) => {
+  const signIn = useCallback(async (response: GoogleAuthResponse) => {
     setIsLoading(true);
     setError(null);
     
     try {
       // Handle OAuth2 token response (has access_token)
-      if (tokenResponse.access_token) {
+      if ('access_token' in response) {
         console.log('[v0] Processing OAuth2 access token');
-        const accessToken = tokenResponse.access_token;
+        const accessToken = response.access_token;
         
         // Store token immediately before attempting userinfo fetch
         localStorage.setItem('google_access_token', accessToken);
@@ -140,11 +141,11 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           setUser({ email: 'usuario@gmail.com', name: 'Usuario', picture: undefined });
           setSyncStatus('synced');
         }
-      } else if (tokenResponse.credential) {
+      } else if ('credential' in response) {
         // Handle legacy GSI identity token
         console.log('[v0] Processing GSI identity token');
         
-        const base64Url = tokenResponse.credential.split('.')[1];
+        const base64Url = response.credential.split('.')[1];
         const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
         const jsonPayload = decodeURIComponent(
           atob(base64)
@@ -155,14 +156,14 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         
         const decoded = JSON.parse(jsonPayload);
         
-        localStorage.setItem('google_access_token', tokenResponse.credential);
+        localStorage.setItem('google_access_token', response.credential);
         localStorage.setItem('google_user', JSON.stringify({
           email: decoded.email,
           name: decoded.name,
           picture: decoded.picture,
         }));
         
-        setAccessToken(tokenResponse.credential);
+        setAccessToken(response.credential);
         setUser({
           email: decoded.email,
           name: decoded.name,
@@ -171,14 +172,14 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setIsAuthenticated(true);
         setSyncStatus('synced');
       } else {
-        console.error('[v0] No access_token or credential in response');
-        setError('Authentication failed: No token received');
+        console.error('[v0] Invalid response format');
+        setError('Authentication failed: Invalid response');
       }
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Authentication failed';
       setError(errorMessage);
-      console.error('[v0] Credential response error:', err);
+      console.error('[v0] Auth error:', err);
     } finally {
       setIsLoading(false);
     }

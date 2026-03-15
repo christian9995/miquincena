@@ -7,9 +7,9 @@ import { AppState } from './google-drive';
 
 // Re-export the conflict resolver at the top level for easier imports
 export function resolveSyncConflict(
-  local: any,
-  remote: any
-): any {
+  local: AppState,
+  remote: AppState
+): AppState {
   const localTimestamp = local.timestamp || 0;
   const remoteTimestamp = remote.timestamp || 0;
 

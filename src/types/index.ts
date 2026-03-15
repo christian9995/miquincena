@@ -26,3 +26,32 @@ export const CATEGORIES = [
 ] as const;
 
 export type Category = typeof CATEGORIES[number];
+
+// Google Auth Types
+export interface GoogleOAuth2TokenResponse {
+    access_token: string;
+    token_type: string;
+    scope?: string;
+    expires_in?: number;
+}
+
+export interface GoogleIdentityToken {
+    credential: string;
+    select_by?: string;
+}
+
+export type GoogleAuthResponse = GoogleOAuth2TokenResponse | GoogleIdentityToken;
+
+export interface GoogleUserInfo {
+    email: string;
+    name: string;
+    picture?: string;
+}
+
+// Sync Types
+export interface AppState {
+    transactions: Transaction[];
+    budgets: Budgets;
+    seedDate: string;
+    timestamp: number;
+}
