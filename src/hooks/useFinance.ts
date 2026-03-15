@@ -47,6 +47,14 @@ export function useFinance() {
         setIsInitialized(true);
     }, []);
 
+    // Recalculate current period index when seed date changes
+    useEffect(() => {
+        if (isInitialized) {
+            const newPeriodIndex = getCurrentPeriodIndex(new Date(), seedDate);
+            setCurrentPeriodIndex(newPeriodIndex);
+        }
+    }, [seedDate, isInitialized]);
+
     // Save data whenever it changes
     useEffect(() => {
         if (isInitialized) {
