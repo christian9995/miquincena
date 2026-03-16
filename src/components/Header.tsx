@@ -43,9 +43,9 @@ export default function Header({ onConfigClick }: HeaderProps) {
         <div className="max-w-7xl mx-auto px-4 md:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img 
-              src="/icon-192.png" 
-              alt="Mi Quincena" 
-              className="w-10 h-10 md:w-12 md:h-12"
+              src="/logo.png" 
+              alt="Mi Quincena Logo" 
+              className="w-10 h-10 md:w-12 md:h-12 object-contain"
             />
             <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Mi Quincena</h1>
           </div>
