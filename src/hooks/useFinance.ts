@@ -48,6 +48,10 @@ export function useFinance() {
                             setBudgets(merged.budgets);
                             setSeedDate(merged.seedDate);
                             updateSyncStatus(false, 'synced');
+                            
+                            // After merging, set current period based on today's date
+                            const todayPeriodIndex = getCurrentPeriodIndex(new Date(), merged.seedDate);
+                            setCurrentPeriodIndex(todayPeriodIndex);
                         } else {
                             console.log('[v0] No data in Google Drive, using localStorage');
                             updateSyncStatus(false, 'pending');
@@ -87,6 +91,13 @@ export function useFinance() {
 
             if (savedSeedDate) {
                 setSeedDate(savedSeedDate);
+                // After setting seed date, calculate current period based on today's date
+                const todayPeriodIndex = getCurrentPeriodIndex(new Date(), savedSeedDate);
+                setCurrentPeriodIndex(todayPeriodIndex);
+            } else {
+                // If no seed date saved, calculate for default seed date
+                const todayPeriodIndex = getCurrentPeriodIndex(new Date(), '2026-01-02');
+                setCurrentPeriodIndex(todayPeriodIndex);
             }
         };
 
