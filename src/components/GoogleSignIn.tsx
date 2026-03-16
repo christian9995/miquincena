@@ -20,6 +20,28 @@ export default function GoogleSignIn() {
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Handle token response - defined outside useEffect to ensure proper scope
+  const handleTokenResponse = useCallback(async (response: any) => {
+    console.log('[v0] OAuth2 token response received');
+    console.log('[v0] Response keys:', Object.keys(response));
+    
+    if (response.access_token) {
+      console.log('[v0] Access token present, length:', response.access_token.length);
+      console.log('[v0] Token prefix:', response.access_token.substring(0, 20) + '...');
+      console.log('[v0] Calling signIn with token');
+      await signIn({
+        access_token: response.access_token,
+        token_type: response.token_type || 'Bearer',
+      });
+    } else if (response.error) {
+      console.error('[v0] OAuth2 error:', response.error, response.error_description);
+      setError(`OAuth2 error: ${response.error}`);
+    } else {
+      console.error('[v0] No access token in response:', response);
+      setError('No token received from OAuth2');
+    }
+  }, [signIn]);
+
   // Initialize OAuth2 TokenClient for drive.appdata access
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -74,6 +96,7 @@ export default function GoogleSignIn() {
 
         script.onerror = () => {
           console.error('[v0] Failed to load Google API client');
+          setError('Failed to load Google API');
           setIsReady(false);
         };
 
@@ -93,6 +116,7 @@ export default function GoogleSignIn() {
 
       if (!window.google) {
         console.error('[v0] Google object not available');
+        setError('Google API unavailable');
         setIsReady(false);
         return;
       }
@@ -104,46 +128,27 @@ export default function GoogleSignIn() {
         tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
           client_id: GOOGLE_CLIENT_ID,
           scope: 'https://www.googleapis.com/auth/drive.appdata openid email profile',
-          callback: (response: any) => {
-            console.log('[v0] OAuth2 token response received');
-            handleTokenResponse(response);
-          },
+          callback: handleTokenResponse, // Use the callback from outer scope
         });
 
         window.__googleOAuth2Initialized = true;
         console.log('[v0] Google OAuth2 initialized successfully');
         setIsReady(true);
+        setError(null);
 
       } catch (err) {
         console.error('[v0] Error initializing Google OAuth2:', err);
+        setError('OAuth2 initialization failed');
         setIsReady(false);
       }
     };
-
-  const handleTokenResponse = async (response: any) => {
-    console.log('[v0] OAuth2 token response received');
-    console.log('[v0] Response keys:', Object.keys(response));
-    
-    if (response.access_token) {
-      console.log('[v0] Access token present, length:', response.access_token.length);
-      console.log('[v0] Calling signIn with token');
-      await signIn({
-        access_token: response.access_token,
-        token_type: response.token_type || 'Bearer',
-      });
-    } else if (response.error) {
-      console.error('[v0] OAuth2 error:', response.error, response.error_description);
-    } else {
-      console.error('[v0] No access token in response:', response);
-    }
-  };
 
     initWhenReady();
 
     return () => {
       document.removeEventListener('DOMContentLoaded', loadAndInitializeOAuth2);
     };
-  }, [signIn]);
+  }, [handleTokenResponse]);
 
   const handleSignInClick = () => {
     console.log('[v0] Sign-in button clicked');
