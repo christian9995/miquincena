@@ -177,12 +177,12 @@ export default function GoogleSignIn() {
   return (
     <button
       onClick={handleSignInClick}
-      className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 font-medium text-gray-700"
+      className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 font-medium"
     >
       <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
         <path d="M12 11.75c-.98 0-1.876.38-2.534 1.019-.658.64-1.025 1.508-1.025 2.406s.367 1.766 1.025 2.406c.658.64 1.554 1.019 2.534 1.019.98 0 1.876-.38 2.534-1.019.658-.64 1.025-1.508 1.025-2.406s-.367-1.766-1.025-2.406c-.658-.64-1.554-1.019-2.534-1.019z" />
       </svg>
-      Sync con Google
+      Sincronizar con Google
     </button>
   );
 }

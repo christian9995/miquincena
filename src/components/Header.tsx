@@ -44,62 +44,6 @@ export default function Header({ onConfigClick }: HeaderProps) {
           <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Mi Quincena</h1>
           
           <div className="flex items-center gap-3">
-            {/* Sync Status and Google Sign-In */}
-            <div className="flex items-center gap-2">
-              {isAuthenticated && user ? (
-                <div className="flex items-center gap-2">
-                  {/* Profile Picture */}
-                  {user.picture && (
-                    <img
-                      src={user.picture}
-                      alt={user.name}
-                      className="w-8 h-8 rounded-full"
-                      title={user.email}
-                    />
-                  )}
-                  
-                  {/* Sync Status Indicator */}
-                  <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 rounded-lg">
-                    {syncStatus === 'synced' && (
-                      <>
-                        <Cloud size={16} className="text-green-600" />
-                        <span className="text-xs text-gray-600">Sincronizado</span>
-                      </>
-                    )}
-                    {syncStatus === 'pending' && (
-                      <>
-                        <Cloud size={16} className="text-yellow-600 animate-pulse" />
-                        <span className="text-xs text-gray-600">Pendiente de subir</span>
-                      </>
-                    )}
-                    {syncStatus === 'error' && (
-                      <>
-                        <AlertCircle size={16} className="text-red-600" />
-                        <span className="text-xs text-gray-600">Error de conexión</span>
-                      </>
-                    )}
-                    {syncStatus === 'offline' && (
-                      <>
-                        <Wifi size={16} className="text-gray-400" />
-                        <span className="text-xs text-gray-600">Sin conexión</span>
-                      </>
-                    )}
-                  </div>
-                  
-                  {/* Sign Out Button */}
-                  <button
-                    onClick={() => signOut()}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                    title="Cerrar sesión"
-                  >
-                    <LogOut size={18} className="text-gray-600" />
-                  </button>
-                </div>
-              ) : (
-                <GoogleSignIn />
-              )}
-            </div>
-            
             {/* Hamburger Menu Button */}
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -118,10 +62,77 @@ export default function Header({ onConfigClick }: HeaderProps) {
         {/* Mobile Menu */}
         {isMenuOpen && (
           <div className="border-t border-gray-200 bg-white">
-            <div className="max-w-7xl mx-auto px-4 md:px-8 py-4 space-y-2">
+            <div className="max-w-7xl mx-auto px-4 md:px-8 py-4 space-y-4">
+              {/* Google Auth Section */}
+              {isAuthenticated && user ? (
+                <div className="pb-4 border-b border-gray-200 space-y-3">
+                  {/* User Profile */}
+                  <div className="flex items-center gap-3 px-2">
+                    {user.picture && (
+                      <img
+                        src={user.picture}
+                        alt={user.name}
+                        className="w-10 h-10 rounded-full"
+                        title={user.email}
+                      />
+                    )}
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-800">Conectado como</p>
+                      <p className="text-sm text-gray-600">{user.name}</p>
+                    </div>
+                  </div>
+
+                  {/* Sync Status Indicator */}
+                  <div className="flex items-center gap-2 px-2 py-2 bg-gray-50 rounded-lg mx-2">
+                    {syncStatus === 'synced' && (
+                      <>
+                        <Cloud size={16} className="text-green-600 flex-shrink-0" />
+                        <span className="text-sm text-green-700 font-medium">Sincronizado</span>
+                      </>
+                    )}
+                    {syncStatus === 'pending' && (
+                      <>
+                        <Cloud size={16} className="text-yellow-600 animate-pulse flex-shrink-0" />
+                        <span className="text-sm text-yellow-700 font-medium">Pendiente de subir</span>
+                      </>
+                    )}
+                    {syncStatus === 'error' && (
+                      <>
+                        <AlertCircle size={16} className="text-red-600 flex-shrink-0" />
+                        <span className="text-sm text-red-700 font-medium">Error de conexión</span>
+                      </>
+                    )}
+                    {syncStatus === 'offline' && (
+                      <>
+                        <Wifi size={16} className="text-gray-400 flex-shrink-0" />
+                        <span className="text-sm text-gray-600 font-medium">Sin conexión</span>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Logout Button */}
+                  <button
+                    onClick={() => {
+                      signOut();
+                      handleMenuClose();
+                    }}
+                    className="w-full flex items-center gap-2 px-4 py-2 hover:bg-red-50 rounded-lg font-medium text-red-600 transition-colors"
+                  >
+                    <LogOut size={18} />
+                    Cerrar Sesión
+                  </button>
+                </div>
+              ) : (
+                <div className="pb-4 border-b border-gray-200">
+                  <GoogleSignIn />
+                </div>
+              )}
+
+              {/* Menu Items */}
               <button
                 onClick={() => {
                   setActiveSection('about');
+                  handleMenuClose();
                 }}
                 className="w-full text-left px-4 py-2 hover:bg-gray-50 rounded-lg font-medium text-gray-700 transition-colors"
               >
@@ -130,6 +141,7 @@ export default function Header({ onConfigClick }: HeaderProps) {
               <button
                 onClick={() => {
                   setActiveSection('guide');
+                  handleMenuClose();
                 }}
                 className="w-full text-left px-4 py-2 hover:bg-gray-50 rounded-lg font-medium text-gray-700 transition-colors"
               >
