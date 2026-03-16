@@ -122,17 +122,22 @@ export default function GoogleSignIn() {
       }
 
       try {
-        console.log('[v0] Initializing OAuth2 TokenClient with drive.appdata scope');
+        console.log('[v0] Initializing OAuth2 TokenClient');
+        console.log('[v0] Client ID:', GOOGLE_CLIENT_ID.substring(0, 20) + '...');
         
-        // Initialize OAuth2 TokenClient with drive.appdata scope
+        // Initialize OAuth2 TokenClient with properly formatted scopes
+        // Google OAuth2 requires scopes separated by URL-encoded spaces (%20)
+        const scopes = 'openid email profile https://www.googleapis.com/auth/drive.appdata';
+        
         tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
           client_id: GOOGLE_CLIENT_ID,
-          scope: 'https://www.googleapis.com/auth/drive.appdata openid email profile',
-          callback: handleTokenResponse, // Use the callback from outer scope
+          scope: scopes,
+          callback: handleTokenResponse,
         });
 
         window.__googleOAuth2Initialized = true;
         console.log('[v0] Google OAuth2 initialized successfully');
+        console.log('[v0] Scopes configured:', scopes);
         setIsReady(true);
         setError(null);
 
