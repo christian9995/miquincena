@@ -1,7 +1,6 @@
 export type TransactionType = 'ingreso' | 'egreso';
 
 export interface Transaction {
-    id: string;
     desc: string;
     amount: number | string;
     date: string;

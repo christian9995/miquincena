@@ -34,21 +34,13 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [hasPendingSync, setHasPendingSync] = useState(false);
 
-  // Monitor online/offline status and trigger sync immediately
+  // Monitor online/offline status
   useEffect(() => {
-    const handleOnline = async () => {
-      console.log('[v0] Connection restored - triggering immediate sync');
+    const handleOnline = () => {
+      console.log('[v0] Connection restored');
       setIsOnline(true);
       setSyncStatus('pending');
       setHasPendingSync(true);
-      
-      // Trigger pending sync immediately
-      if (isAuthenticated && accessToken) {
-        console.log('[v0] Attempting immediate sync on reconnect');
-        triggerPendingSync().catch((err) => {
-          console.error('[v0] Immediate sync failed:', err);
-        });
-      }
     };
 
     const handleOffline = () => {
@@ -64,7 +56,7 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [isAuthenticated, accessToken]);
+  }, []);
 
   // Check if user is already authenticated on mount
   useEffect(() => {
@@ -238,17 +230,11 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, [isOnline]);
 
   const triggerPendingSync = useCallback(async () => {
-    console.log('[v0] Triggering pending sync on reconnect');
-    
-    if (!isAuthenticated || !accessToken || !isOnline) {
-      console.log('[v0] Cannot sync - not authenticated or offline');
-      return;
-    }
-
-    // The actual sync will be triggered by useFinance hook
-    // This just marks that sync should happen
-    setHasPendingSync(true);
-  }, [isAuthenticated, accessToken, isOnline]);
+    console.log('[v0] Triggering pending sync');
+    // This will be called by useFinance when connection is restored
+    // The actual sync logic is handled by the sync manager
+    setHasPendingSync(false);
+  }, []);
 
   return (
     <GoogleAuthContext.Provider

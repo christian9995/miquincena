@@ -120,93 +120,6 @@ async function findOrCreateFile(accessToken: string): Promise<string> {
 }
 
 /**
- * Get the last modified timestamp of the remote file without downloading
- * Used for Local-First sync decision making
- */
-export async function getRemoteFileTimestamp(accessToken: string): Promise<string | null> {
-  try {
-    if (!accessToken) {
-      console.log('[v0] No access token for checking remote timestamp');
-      return null;
-    }
-
-    console.log('[v0] Checking remote file timestamp');
-    
-    const searchResponse = await fetch(
-      `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='${FILE_NAME}'&fields=files(id,modifiedTime)`,
-      {
-        headers: { 
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    // Detect token expiration (401)
-    if (searchResponse.status === 401) {
-      console.error('[v0] Token expired (401) when checking remote timestamp');
-      throw new Error('TOKEN_EXPIRED');
-    }
-
-    if (!searchResponse.ok) {
-      const errorText = await searchResponse.text();
-      console.error('[v0] Failed to check remote timestamp:', searchResponse.status, errorText);
-      return null;
-    }
-
-    const searchData = await searchResponse.json();
-    if (searchData.files && searchData.files.length > 0) {
-      const modifiedTime = searchData.files[0].modifiedTime;
-      console.log('[v0] Remote file modified:', modifiedTime);
-      return modifiedTime;
-    }
-
-    console.log('[v0] No remote file found');
-    return null;
-  } catch (err) {
-    if (err instanceof Error && err.message === 'TOKEN_EXPIRED') {
-      throw err; // Re-throw token expiration for handling in auth context
-    }
-    console.error('[v0] Error getting remote timestamp:', err);
-    return null;
-  }
-}
-
-/**
- * Save app state to Google Drive with Local-First validation
- */
-export async function saveAppStateToDriveWithLocalFirst(
-  accessToken: string,
-  appState: AppState,
-  remoteModifiedTime?: string
-): Promise<void> {
-  try {
-    const { determineSyncDirection } = await import('./sync-manager');
-    const syncDirection = determineSyncDirection(
-      appState.timestamp,
-      0,
-      remoteModifiedTime
-    );
-
-    console.log('[v0] Sync direction determined:', syncDirection);
-
-    if (syncDirection === 'skip') {
-      console.log('[v0] Skipping sync - timestamps too close');
-      return;
-    }
-
-    // Always save (upload local data to Drive)
-    await saveAppStateToDrive(accessToken, appState);
-  } catch (err) {
-    if (err instanceof Error && err.message === 'TOKEN_EXPIRED') {
-      throw err; // Re-throw for token refresh handling
-    }
-    console.error('[v0] Error in Local-First save:', err);
-    throw err;
-  }
-}
-
-/**
  * Load app state from Google Drive
  */
 export async function loadAppStateFromDrive(accessToken: string): Promise<AppState | null> {
@@ -231,12 +144,6 @@ export async function loadAppStateFromDrive(accessToken: string): Promise<AppSta
     );
 
     console.log('[v0] Load Search response status:', searchResponse.status);
-
-    // Detect token expiration (401)
-    if (searchResponse.status === 401) {
-      console.error('[v0] Token expired (401) when loading from Drive');
-      throw new Error('TOKEN_EXPIRED');
-    }
 
     if (!searchResponse.ok) {
       const errorText = await searchResponse.text();
@@ -266,13 +173,6 @@ export async function loadAppStateFromDrive(accessToken: string): Promise<AppSta
     if (!contentResponse.ok) {
       const errorText = await contentResponse.text();
       console.error('[v0] Drive Load Content Error:', contentResponse.status, contentResponse.statusText);
-      
-      // Detect token expiration (401)
-      if (contentResponse.status === 401) {
-        console.error('[v0] Token expired (401) when loading content from Drive');
-        throw new Error('TOKEN_EXPIRED');
-      }
-      
       return null;
     }
 
@@ -280,9 +180,6 @@ export async function loadAppStateFromDrive(accessToken: string): Promise<AppSta
     console.log('[v0] Successfully loaded app state from Google Drive');
     return appState;
   } catch (err) {
-    if (err instanceof Error && err.message === 'TOKEN_EXPIRED') {
-      throw err; // Re-throw token expiration for handling in auth context
-    }
     console.error('[v0] Error loading app state from Drive:', err);
     return null;
   }
@@ -329,21 +226,11 @@ export async function saveAppStateToDrive(
     if (!updateResponse.ok) {
       const errorText = await updateResponse.text();
       console.error('[v0] Drive Update Error:', updateResponse.status, updateResponse.statusText, errorText);
-      
-      // Detect token expiration (401)
-      if (updateResponse.status === 401) {
-        console.error('[v0] Token expired (401) when saving to Drive');
-        throw new Error('TOKEN_EXPIRED');
-      }
-      
       throw new Error(`Update failed with status ${updateResponse.status}: ${updateResponse.statusText}`);
     }
 
     console.log('[v0] Successfully saved app state to Google Drive');
   } catch (err) {
-    if (err instanceof Error && err.message === 'TOKEN_EXPIRED') {
-      throw err; // Re-throw token expiration for handling in auth context
-    }
     console.error('[v0] Error saving app state to Drive:', err);
     throw err;
   }
