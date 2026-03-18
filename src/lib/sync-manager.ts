@@ -1,5 +1,5 @@
 /**
- * Sync Manager - v2.1 (Clean Rebuild)
+ * Sync Manager - Clean Implementation
  * Orchestrates local/remote sync with Local-First conflict resolution
  */
 

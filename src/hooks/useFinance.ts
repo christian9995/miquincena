@@ -208,11 +208,11 @@ export const useFinance = () => {
         const categories: Record<string, number> = {};
 
         periodTransactions.forEach(t => {
-            if (t.type === 'income') {
-                totalIncome += t.amount;
+            if (t.type === 'ingreso') {
+                totalIncome += t.amount as number;
             } else {
-                totalExpenses += t.amount;
-                categories[t.category] = (categories[t.category] || 0) + t.amount;
+                totalExpenses += t.amount as number;
+                categories[t.category] = (categories[t.category] || 0) + (t.amount as number);
             }
         });
 

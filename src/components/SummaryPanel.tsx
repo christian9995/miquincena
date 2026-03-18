@@ -8,7 +8,7 @@ interface SummaryPanelProps {
     income: number;
     expenses: number;
     net: number;
-    budget: { income: number; expense: number };
+    budget?: { income: number; expense: number };
     categoryTotals: Record<string, number>;
     onClearAll: () => void;
 }
@@ -47,8 +47,8 @@ export default function SummaryPanel({
                     <BarChart
                         realIncome={income}
                         realExpense={expenses}
-                        metaIncome={budget?.income || 0}
-                        metaExpense={budget?.expense || 0}
+                        metaIncome={budget?.income ?? 0}
+                        metaExpense={budget?.expense ?? 0}
                     />
                     <PieChart categoryTotals={categoryTotals} />
                 </div>
