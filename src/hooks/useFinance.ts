@@ -5,7 +5,7 @@ import { Transaction, Budgets, TransactionType } from '@/types';
 import { getCurrentPeriodIndex, getPeriodDates } from '@/lib/finance-utils';
 import { useGoogleAuth } from '@/context/GoogleAuthContext';
 import { saveAppStateToDrive, loadAppStateFromDrive } from '@/lib/google-drive';
-import { resolveSyncConflict } from '@/lib/sync-manager';
+import { resolveSyncConflict, deepMergeAppState } from '@/lib/sync-manager';
 
 const STORAGE_KEY_TRANSACTIONS = 'finanzas_v2026';
 const STORAGE_KEY_BUDGETS = 'presupuestos_v2026';
@@ -32,33 +32,48 @@ export function useFinance() {
                 
                 // Then attempt Google Drive sync if authenticated and online
                 if (isAuthenticated && accessToken && isOnline) {
-                    console.log('[v0] Attempting to load from Google Drive');
+                    console.log('[v0] Attempting to sync with Google Drive');
                     try {
+                        // UPLOAD-FIRST: Always upload local changes before attempting download
+                        console.log('[v0] Uploading local changes to Drive first');
+                        await saveAppStateToDrive(accessToken, {
+                            transactions,
+                            budgets,
+                            seedDate,
+                            timestamp: Date.now(),
+                        });
+                        console.log('[v0] Successfully uploaded local changes to Drive');
+                        
+                        // THEN download remote data to check for newer changes from other devices
+                        console.log('[v0] Downloading remote data to check for newer changes');
                         const driveData = await loadAppStateFromDrive(accessToken);
                         if (driveData) {
                             const localState = {
                                 transactions: JSON.parse(localStorage.getItem(STORAGE_KEY_TRANSACTIONS) || '[]'),
                                 budgets: JSON.parse(localStorage.getItem(STORAGE_KEY_BUDGETS) || '{}'),
                                 seedDate: localStorage.getItem(STORAGE_KEY_SEED_DATE) || '2026-01-02',
-                                timestamp: 0,
+                                timestamp: Date.now(),
                             };
                             
-                            const merged = resolveSyncConflict(localState, driveData);
+                            // Deep merge with transaction-level identity tracking
+                            const merged = deepMergeAppState(localState, driveData);
                             setTransactions(merged.transactions);
                             setBudgets(merged.budgets);
                             setSeedDate(merged.seedDate);
                             updateSyncStatus(false, 'synced');
+                            console.log('[v0] Deep merge complete: local transactions kept if no remote match');
                             
                             // After merging, set current period based on today's date
                             const todayPeriodIndex = getCurrentPeriodIndex(new Date(), merged.seedDate);
                             setCurrentPeriodIndex(todayPeriodIndex);
                         } else {
-                            console.log('[v0] No data in Google Drive, using localStorage');
-                            updateSyncStatus(false, 'pending');
+                            console.log('[v0] No data in Google Drive, local changes remain');
+                            updateSyncStatus(false, 'synced');
                         }
                     } catch (driveErr) {
                         console.log('[v0] Google Drive sync not available - using localStorage only');
                         console.log('[v0] Note: Google Drive sync requires proper OAuth 2.0 Authorization Code Flow with drive.appdata scope');
+                        console.log('[v0] Error:', driveErr);
                         updateSyncStatus(false, 'offline');
                     }
                 }

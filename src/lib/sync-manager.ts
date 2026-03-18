@@ -7,9 +7,126 @@
 import { AppState } from './google-drive';
 
 /**
- * Local-First Sync Conflict Resolution
+ * Local-First Deep Merge Strategy
+ * Merges local and remote data with transaction-level identity tracking
+ * Rule: Most recent updatedAt timestamp wins, local-only transactions never deleted
+ */
+export function deepMergeAppState(
+  local: AppState,
+  remote: AppState
+): AppState {
+  console.log('[v0] Starting deep merge of local and remote app states');
+  
+  // Merge transactions by ID (not by index)
+  const mergedTransactions = mergeTransactionsByID(local.transactions, remote.transactions);
+  
+  // Merge budgets by period index
+  const mergedBudgets = mergeBudgetsByPeriod(local.budgets, remote.budgets);
+  
+  // Use most recent app-level timestamp
+  const mergedTimestamp = Math.max(local.timestamp || 0, remote.timestamp || 0);
+  
+  // Keep local seed date if it exists, otherwise use remote
+  const mergedSeedDate = local.seedDate || remote.seedDate;
+
+  return {
+    transactions: mergedTransactions,
+    budgets: mergedBudgets,
+    seedDate: mergedSeedDate,
+    timestamp: mergedTimestamp,
+  };
+}
+
+/**
+ * Merge transactions by ID with timestamp-based conflict resolution
+ * Local transactions without a remote match are kept (pending upload)
+ */
+function mergeTransactionsByID(
+  localTxs: AppState['transactions'],
+  remoteTxs: AppState['transactions']
+): AppState['transactions'] {
+  const result: AppState['transactions'] = [];
+  const processedIds = new Set<string>();
+
+  // Process all local transactions
+  for (const localTx of localTxs) {
+    const txId = localTx.id || `local_${localTxs.indexOf(localTx)}`;
+    processedIds.add(txId);
+    
+    // Find matching remote transaction
+    const remoteTx = remoteTxs.find(tx => (tx.id || `remote_${remoteTxs.indexOf(tx)}`) === txId);
+    
+    if (!remoteTx) {
+      // Local transaction not in remote: KEEP IT (pending upload)
+      console.log('[v0] Keeping local transaction (no remote match):', txId);
+      result.push({ ...localTx, id: txId });
+    } else {
+      // Both exist: use most recent based on updatedAt
+      const localTimestamp = new Date(localTx.updatedAt || 0).getTime();
+      const remoteTimestamp = new Date(remoteTx.updatedAt || 0).getTime();
+      
+      if (localTimestamp >= remoteTimestamp) {
+        console.log('[v0] Using local version of transaction:', txId);
+        result.push(localTx);
+      } else {
+        console.log('[v0] Using remote version of transaction:', txId);
+        result.push(remoteTx);
+      }
+    }
+  }
+
+  // Process remote transactions not in local (new remote items)
+  for (const remoteTx of remoteTxs) {
+    const txId = remoteTx.id || `remote_${remoteTxs.indexOf(remoteTx)}`;
+    
+    if (!processedIds.has(txId)) {
+      console.log('[v0] Adding new remote transaction:', txId);
+      result.push(remoteTx);
+    }
+  }
+
+  console.log('[v0] Merged transactions: local=', localTxs.length, 'remote=', remoteTxs.length, 'result=', result.length);
+  return result;
+}
+
+/**
+ * Merge budgets by period index with timestamp-based conflict resolution
+ */
+function mergeBudgetsByPeriod(
+  localBudgets: AppState['budgets'],
+  remoteBudgets: AppState['budgets']
+): AppState['budgets'] {
+  const result: AppState['budgets'] = { ...localBudgets };
+
+  for (const periodStr in remoteBudgets) {
+    const period = parseInt(periodStr);
+    const remoteBudget = remoteBudgets[period];
+    const localBudget = result[period];
+
+    if (!localBudget) {
+      // Remote budget period doesn't exist locally: use remote
+      console.log('[v0] Adding new remote budget for period:', period);
+      result[period] = remoteBudget;
+    } else {
+      // Both exist: use most recent
+      const localTimestamp = new Date(localBudget.updatedAt || 0).getTime();
+      const remoteTimestamp = new Date(remoteBudget.updatedAt || 0).getTime();
+
+      if (remoteTimestamp > localTimestamp) {
+        console.log('[v0] Updating budget for period:', period, 'from remote');
+        result[period] = remoteBudget;
+      } else {
+        console.log('[v0] Keeping local budget for period:', period);
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Original Local-First Sync Conflict Resolution (for backward compatibility)
  * Compares timestamps of local vs remote data and returns the version with the most recent timestamp
- * This ensures that no data is lost and the most up-to-date version is always used
  */
 export function resolveSyncConflict(
   local: AppState,
