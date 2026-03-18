@@ -47,8 +47,8 @@ export default function SummaryPanel({
                     <BarChart
                         realIncome={income}
                         realExpense={expenses}
-                        metaIncome={budget.income}
-                        metaExpense={budget.expense}
+                        metaIncome={budget?.income || 0}
+                        metaExpense={budget?.expense || 0}
                     />
                     <PieChart categoryTotals={categoryTotals} />
                 </div>

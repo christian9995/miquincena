@@ -1,5 +1,5 @@
 /**
- * Sync Manager
+ * Sync Manager - v2.1 (Clean Rebuild)
  * Orchestrates local/remote sync with Local-First conflict resolution
  */
 
@@ -25,19 +25,16 @@ export function resolveSyncConflict(
   console.log('[v0] Local timestamp:', localTimestamp);
   console.log('[v0] Remote timestamp:', remoteModified);
 
-  // Local is newer or equal: keep local (Local-First priority)
   if (localTimestamp >= remoteModified) {
-    console.log('[v0] Local data is newer or equal - LOCAL-FIRST strategy applies');
+    console.log('[v0] Local data is newer or equal - keeping local');
     return local;
   }
 
-  // Remote is significantly newer (more than 5 seconds): use remote
   if (remoteModified > localTimestamp + 5000) {
     console.log('[v0] Remote data is significantly newer, using remote');
     return remote;
   }
 
-  // Default: keep local (safe default for conflicts)
   console.log('[v0] Timestamps too close, keeping local data');
   return local;
 }
@@ -54,23 +51,14 @@ export function determineSyncDirection(
   const remoteModified = remoteModifiedTime ? new Date(remoteModifiedTime).getTime() : remoteTimestamp;
   const timeDiff = remoteModified - localTimestamp;
 
-  console.log('[v0] Determining sync direction');
-  console.log('[v0] Time difference (remote - local):', timeDiff, 'ms');
-
-  // Local is newer or equal: upload
   if (localTimestamp >= remoteModified) {
-    console.log('[v0] Sync direction: UPLOAD (local is newer or equal)');
     return 'upload';
   }
 
-  // Remote is significantly newer: download
   if (timeDiff > 5000) {
-    console.log('[v0] Sync direction: DOWNLOAD (remote is significantly newer)');
     return 'download';
   }
 
-  // Very close timestamps: skip to avoid thrashing
-  console.log('[v0] Sync direction: SKIP (timestamps too close)');
   return 'skip';
 }
 
