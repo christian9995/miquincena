@@ -24,12 +24,36 @@ export function useFinance() {
     const { isAuthenticated, accessToken, updateSyncStatus, isOnline } = useGoogleAuth();
     const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+    // Helper to safely get from localStorage (guards against SSR)
+    const getFromStorage = useCallback((key: string): string | null => {
+        if (typeof window === 'undefined') return null;
+        try {
+            return localStorage.getItem(key);
+        } catch (err) {
+            console.error('[v0] Error reading from localStorage:', err);
+            return null;
+        }
+    }, []);
+
+    // Helper to safely set to localStorage (guards against SSR)
+    const setToStorage = useCallback((key: string, value: string): void => {
+        if (typeof window === 'undefined') return;
+        try {
+            localStorage.setItem(key, value);
+        } catch (err) {
+            console.error('[v0] Error writing to localStorage:', err);
+        }
+    }, []);
+
     /**
      * Load data from localStorage and optionally sync with Google Drive
      * Implements Local-First strategy: local data always saves first
      */
     useEffect(() => {
         const initializeApp = async () => {
+            // Skip if not in browser
+            if (typeof window === 'undefined') return;
+
             // Step 1: Always load from localStorage first (Offline-First)
             loadFromLocalStorage();
             
@@ -37,13 +61,15 @@ export function useFinance() {
             if (isAuthenticated && accessToken && isOnline) {
                 await syncWithDriveOnInit();
             }
+
+            setIsInitialized(true);
         };
 
         const loadFromLocalStorage = () => {
             try {
-                const savedTransactions = localStorage.getItem(STORAGE_KEY_TRANSACTIONS);
-                const savedBudgets = localStorage.getItem(STORAGE_KEY_BUDGETS);
-                const savedSeedDate = localStorage.getItem(STORAGE_KEY_SEED_DATE);
+                const savedTransactions = getFromStorage(STORAGE_KEY_TRANSACTIONS);
+                const savedBudgets = getFromStorage(STORAGE_KEY_BUDGETS);
+                const savedSeedDate = getFromStorage(STORAGE_KEY_SEED_DATE);
 
                 if (savedTransactions) {
                     setTransactions(JSON.parse(savedTransactions));
@@ -71,7 +97,7 @@ export function useFinance() {
                 console.log('[v0] Attempting to load from Google Drive on init');
                 
                 // Get the data we just loaded from localStorage
-                const localTimestamp = localStorage.getItem(STORAGE_KEY_TIMESTAMP);
+                const localTimestamp = getFromStorage(STORAGE_KEY_TIMESTAMP);
                 const localTs = localTimestamp ? parseInt(localTimestamp) : 0;
                 
                 // Try to load from Drive
@@ -89,7 +115,7 @@ export function useFinance() {
                         setTransactions(driveData.transactions);
                         setBudgets(driveData.budgets);
                         setSeedDate(driveData.seedDate);
-                        localStorage.setItem(STORAGE_KEY_TIMESTAMP, driveTs.toString());
+                        setToStorage(STORAGE_KEY_TIMESTAMP, driveTs.toString());
                         updateSyncStatus(false, 'synced');
                     }
                     
@@ -107,7 +133,7 @@ export function useFinance() {
                 if (err instanceof Error) {
                     if (err.message === 'TOKEN_EXPIRED') {
                         console.error('[v0] Token expired - triggering re-authentication');
-                        localStorage.setItem('google_token_expired', 'true');
+                        setToStorage('google_token_expired', 'true');
                         updateSyncStatus(false, 'error');
                     } else {
                         console.log('[v0] Drive sync failed:', err.message);
@@ -120,24 +146,22 @@ export function useFinance() {
             }
         };
 
-        initializeApp().finally(() => {
-            setIsInitialized(true);
-        });
-    }, [isAuthenticated, accessToken, isOnline, updateSyncStatus]);
+        initializeApp();
+    }, [isAuthenticated, accessToken, isOnline, updateSyncStatus, getFromStorage, setToStorage]);
 
     /**
      * Save to localStorage immediately (Offline-First)
      * Queue sync to Google Drive with Local-First validation
      */
     useEffect(() => {
-        if (!isInitialized) return;
+        if (!isInitialized || typeof window === 'undefined') return;
 
         // ALWAYS save to localStorage first with new timestamp
         const now = Date.now();
-        localStorage.setItem(STORAGE_KEY_TRANSACTIONS, JSON.stringify(transactions));
-        localStorage.setItem(STORAGE_KEY_BUDGETS, JSON.stringify(budgets));
-        localStorage.setItem(STORAGE_KEY_SEED_DATE, seedDate);
-        localStorage.setItem(STORAGE_KEY_TIMESTAMP, now.toString());
+        setToStorage(STORAGE_KEY_TRANSACTIONS, JSON.stringify(transactions));
+        setToStorage(STORAGE_KEY_BUDGETS, JSON.stringify(budgets));
+        setToStorage(STORAGE_KEY_SEED_DATE, seedDate);
+        setToStorage(STORAGE_KEY_TIMESTAMP, now.toString());
 
         console.log('[v0] Data saved to localStorage with timestamp:', now);
 
@@ -165,12 +189,12 @@ export function useFinance() {
                 clearTimeout(syncTimeoutRef.current);
             }
         };
-    }, [transactions, budgets, seedDate, isInitialized, isAuthenticated, accessToken, isOnline, updateSyncStatus]);
+    }, [transactions, budgets, seedDate, isInitialized, isAuthenticated, accessToken, isOnline, updateSyncStatus, setToStorage]);
 
     /**
      * Perform the actual Drive sync with Local-First validation
      */
-    const performDriveSync = async (localTimestamp: number) => {
+    const performDriveSync = useCallback(async (localTimestamp: number) => {
         try {
             if (!accessToken || accessToken.length < 10) {
                 console.error('[v0] Invalid token for sync');
@@ -196,7 +220,7 @@ export function useFinance() {
                 // Handle 401 token expiration
                 if (driveErr instanceof Error && driveErr.message === 'TOKEN_EXPIRED') {
                     console.error('[v0] Token expired during sync - triggering re-authentication');
-                    localStorage.setItem('google_token_expired', 'true');
+                    setToStorage('google_token_expired', 'true');
                     updateSyncStatus(false, 'error');
                 } else {
                     console.error('[v0] Drive sync failed:', driveErr);
@@ -208,7 +232,7 @@ export function useFinance() {
             console.error('[v0] Unexpected error in Drive sync:', err);
             updateSyncStatus(false, 'offline');
         }
-    };
+    }, [accessToken, transactions, budgets, seedDate, updateSyncStatus, setToStorage]);
 
     /**
      * Memoized current period calculations
@@ -267,38 +291,46 @@ export function useFinance() {
         setTransactions((prev) => prev.filter((_, i) => i !== index));
     };
 
-    const saveBudget = (index: number, budget: { income: number; expense: number }) => {
-        setBudgets((prev) => ({
-            ...prev,
-            [index]: budget,
-        }));
+    const updateBudget = (periodIndex: number, budget: { income: number; expense: number }) => {
+        setBudgets((prev) => ({ ...prev, [periodIndex]: budget }));
     };
 
-    const clearAll = () => {
-        if (confirm('¿Borrar TODO?')) {
-            setTransactions([]);
-            setBudgets({});
-            setSeedDate('2026-01-02');
-            localStorage.removeItem(STORAGE_KEY_TRANSACTIONS);
-            localStorage.removeItem(STORAGE_KEY_BUDGETS);
-            localStorage.removeItem(STORAGE_KEY_SEED_DATE);
-            localStorage.removeItem(STORAGE_KEY_TIMESTAMP);
-        }
+    const navigatePeriod = (direction: 'prev' | 'next') => {
+        setCurrentPeriodIndex((prev) => {
+            const totalPeriods = 26; // Number of bi-weekly periods in a year
+            if (direction === 'prev') {
+                return prev > 0 ? prev - 1 : 0;
+            } else {
+                return prev < totalPeriods - 1 ? prev + 1 : totalPeriods - 1;
+            }
+        });
     };
 
     return {
+        // State
         transactions,
         budgets,
         currentPeriodIndex,
-        setCurrentPeriodIndex,
+        seedDate,
+        isInitialized,
         currentPeriodData,
+        
+        // Actions
         addTransaction,
         updateTransaction,
         deleteTransaction,
-        saveBudget,
-        clearAll,
-        isInitialized,
-        seedDate,
+        updateBudget,
+        navigatePeriod,
+        setCurrentPeriodIndex,
         setSeedDate,
+        
+        // Aliases for backwards compatibility
+        saveBudget: updateBudget,
+        clearAll: () => {
+            setTransactions([]);
+            setBudgets({});
+            setToStorage(STORAGE_KEY_TRANSACTIONS, '[]');
+            setToStorage(STORAGE_KEY_BUDGETS, '{}');
+        },
     };
 }
