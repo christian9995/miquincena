@@ -33,30 +33,55 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [hasPendingSync, setHasPendingSync] = useState(false);
+  const connectionRetryTimerRef = React.useRef<NodeJS.Timeout | null>(null);
 
-  // Monitor online/offline status
+  // Monitor online/offline status with robust connection detection
   useEffect(() => {
     const handleOnline = () => {
-      console.log('[v0] Connection restored');
+      console.log('[v0] Online event detected - connection restored');
       setIsOnline(true);
-      setSyncStatus('pending');
-      setHasPendingSync(true);
+      // Mark as pending sync if authenticated
+      if (isAuthenticated) {
+        console.log('[v0] Connection restored and authenticated - marking for sync');
+        setSyncStatus('pending');
+        setHasPendingSync(true);
+      }
     };
 
     const handleOffline = () => {
-      console.log('[v0] Connection lost');
+      console.log('[v0] Offline event detected - connection lost');
       setIsOnline(false);
-      setSyncStatus('offline');
+      // Only set to offline if authenticated (don't confuse offline with not authenticated)
+      if (isAuthenticated) {
+        setSyncStatus('offline');
+      }
     };
+
+    // Periodic connection check (heartbeat) every 30 seconds
+    const connectionCheckInterval = setInterval(() => {
+      const isOnlineNow = navigator.onLine;
+      if (isOnlineNow !== isOnline) {
+        console.log('[v0] Connection state changed via heartbeat check:', isOnlineNow);
+        if (isOnlineNow) {
+          handleOnline();
+        } else {
+          handleOffline();
+        }
+      }
+    }, 30000);
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
     return () => {
+      clearInterval(connectionCheckInterval);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      if (connectionRetryTimerRef.current) {
+        clearTimeout(connectionRetryTimerRef.current);
+      }
     };
-  }, []);
+  }, [isAuthenticated, isOnline]);
 
   // Check if user is already authenticated on mount
   useEffect(() => {

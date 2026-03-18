@@ -6,11 +6,13 @@ export interface Transaction {
     date: string;
     type: TransactionType;
     category: string;
+    updatedAt: string; // ISO timestamp for sync conflict resolution
 }
 
 export interface Budget {
     income: number;
     expense: number;
+    updatedAt: string; // ISO timestamp for sync conflict resolution
 }
 
 export interface Budgets {

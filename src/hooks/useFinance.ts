@@ -210,13 +210,21 @@ export function useFinance() {
     }, [transactions, budgets, currentPeriodIndex, seedDate]);
 
     const addTransaction = (t: Transaction) => {
-        setTransactions((prev) => [...prev, t]);
+        const transactionWithTimestamp = {
+            ...t,
+            updatedAt: new Date().toISOString(),
+        };
+        setTransactions((prev) => [...prev, transactionWithTimestamp]);
     };
 
     const updateTransaction = (index: number, updated: Transaction) => {
+        const updatedWithTimestamp = {
+            ...updated,
+            updatedAt: new Date().toISOString(),
+        };
         setTransactions((prev) => {
             const next = [...prev];
-            next[index] = updated;
+            next[index] = updatedWithTimestamp;
             return next;
         });
     };
@@ -226,9 +234,13 @@ export function useFinance() {
     };
 
     const saveBudget = (index: number, budget: { income: number; expense: number }) => {
+        const budgetWithTimestamp = {
+            ...budget,
+            updatedAt: new Date().toISOString(),
+        };
         setBudgets((prev) => ({
             ...prev,
-            [index]: budget,
+            [index]: budgetWithTimestamp,
         }));
     };
 

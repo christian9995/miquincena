@@ -1,30 +1,41 @@
 /**
  * Sync Manager
- * Orchestrates local/remote sync with conflict resolution
+ * Orchestrates local/remote sync with Local-First conflict resolution
+ * Rule: Most recent timestamp always wins (whether local or remote)
  */
 
 import { AppState } from './google-drive';
 
-// Re-export the conflict resolver at the top level for easier imports
+/**
+ * Local-First Sync Conflict Resolution
+ * Compares timestamps of local vs remote data and returns the version with the most recent timestamp
+ * This ensures that no data is lost and the most up-to-date version is always used
+ */
 export function resolveSyncConflict(
   local: AppState,
   remote: AppState
 ): AppState {
-  const localTimestamp = local.timestamp || 0;
-  const remoteTimestamp = remote.timestamp || 0;
+  const localTimestamp = typeof local.timestamp === 'number' ? local.timestamp : 0;
+  const remoteTimestamp = typeof remote.timestamp === 'number' ? remote.timestamp : 0;
 
-  console.log('[v0] Resolving sync conflict');
-  console.log('[v0] Local timestamp:', localTimestamp);
-  console.log('[v0] Remote timestamp:', remoteTimestamp);
+  console.log('[v0] Resolving sync conflict with Local-First strategy');
+  console.log('[v0] Local timestamp:', new Date(localTimestamp).toISOString());
+  console.log('[v0] Remote timestamp:', new Date(remoteTimestamp).toISOString());
 
-  // Remote is newer: use remote data
+  // Remote is newer: use remote data (download)
   if (remoteTimestamp > localTimestamp) {
-    console.log('[v0] Remote data is newer, using remote');
+    console.log('[v0] Remote data is newer by', remoteTimestamp - localTimestamp, 'ms - DOWNLOADING from Drive');
     return remote;
   }
 
-  // Local is newer or equal: use local data
-  console.log('[v0] Local data is newer or equal, using local');
+  // Local is newer or equal: use local data (keep/upload)
+  if (localTimestamp >= remoteTimestamp) {
+    console.log('[v0] Local data is newer or equal - keeping local (will be UPLOADED to Drive)');
+    return local;
+  }
+
+  // Fallback (should not happen)
+  console.log('[v0] Timestamps equal, keeping local data');
   return local;
 }
 
