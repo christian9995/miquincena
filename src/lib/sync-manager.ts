@@ -30,6 +30,9 @@ export async function verifyAPIConnectivity(): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Local-First Deep Merge Strategy
  * Merges local and remote data with transaction-level identity tracking
  * Rule: Most recent updatedAt timestamp wins, local-only transactions never deleted
  */
