@@ -7,7 +7,29 @@
 import { AppState } from './google-drive';
 
 /**
- * Local-First Deep Merge Strategy
+ * Heartbeat: Verify actual API reachability
+ * Instead of relying on navigator.onLine which can be misleading,
+ * perform a lightweight API call to verify true connectivity
+ */
+export async function verifyAPIConnectivity(): Promise<boolean> {
+  try {
+    const response = await Promise.race([
+      fetch('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&maxResults=1', {
+        method: 'OPTIONS',
+        mode: 'cors',
+      }),
+      new Promise<Response>((_, reject) => 
+        setTimeout(() => reject(new Error('API check timeout')), 5000)
+      ),
+    ]);
+    
+    console.log('[v0] API connectivity check: OK (status', response.status, ')');
+    return response.ok || response.status === 405; // OPTIONS might return 405, but that means the API is reachable
+  } catch (err) {
+    console.log('[v0] API connectivity check failed:', err instanceof Error ? err.message : String(err));
+    return false;
+  }
+}
  * Merges local and remote data with transaction-level identity tracking
  * Rule: Most recent updatedAt timestamp wins, local-only transactions never deleted
  */

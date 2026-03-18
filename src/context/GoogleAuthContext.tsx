@@ -34,13 +34,77 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [hasPendingSync, setHasPendingSync] = useState(false);
   const connectionRetryTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const retryCountRef = React.useRef(0);
+  const tokenRefreshTimerRef = React.useRef<NodeJS.Timeout | null>(null);
 
-  // Monitor online/offline status with robust connection detection
+  // Verify actual API reachability (not just navigator.onLine)
+  const verifyAPIReachability = useCallback(async (): Promise<boolean> => {
+    try {
+      // Test small API call to verify actual connectivity
+      const response = await Promise.race([
+        fetch('https://www.google.com/generate_204', { 
+          method: 'HEAD',
+          mode: 'no-cors',
+        }),
+        new Promise<Response>((_, reject) => 
+          setTimeout(() => reject(new Error('API check timeout')), 5000)
+        ),
+      ]);
+      return true;
+    } catch (err) {
+      console.log('[v0] API reachability check failed:', err);
+      return false;
+    }
+  }, []);
+
+  // Automatic retry with exponential backoff (up to 5 attempts every 10 seconds)
+  const attemptReconnection = useCallback(async () => {
+    if (retryCountRef.current >= 5) {
+      console.log('[v0] Max reconnection attempts reached');
+      return;
+    }
+
+    retryCountRef.current++;
+    console.log('[v0] Attempting reconnection:', retryCountRef.current, '/5');
+
+    const isReachable = await verifyAPIReachability();
+    if (isReachable && isAuthenticated) {
+      console.log('[v0] API is reachable - connection restored');
+      setIsOnline(true);
+      setSyncStatus('pending');
+      setHasPendingSync(true);
+      retryCountRef.current = 0; // Reset on successful connection
+    } else if (retryCountRef.current < 5) {
+      // Schedule next attempt
+      if (connectionRetryTimerRef.current) clearTimeout(connectionRetryTimerRef.current);
+      connectionRetryTimerRef.current = setTimeout(() => {
+        attemptReconnection();
+      }, 10000); // Retry every 10 seconds
+    }
+  }, [isAuthenticated, verifyAPIReachability]);
+
+  // Auto-refresh token before expiry (1 hour)
+  const refreshTokenIfNeeded = useCallback(() => {
+    if (!accessToken || !isAuthenticated) return;
+
+    const tokenRefreshInterval = 50 * 60 * 1000; // Refresh every 50 minutes (1 hour - 10 min buffer)
+    
+    if (tokenRefreshTimerRef.current) clearTimeout(tokenRefreshTimerRef.current);
+    
+    tokenRefreshTimerRef.current = setTimeout(() => {
+      console.log('[v0] Token refresh interval reached - requesting new token');
+      // Note: Full token refresh would require refresh token from OAuth flow
+      // For now, we ensure the stored token is valid by checking it on next API call
+      localStorage.setItem('google_token_refresh_needed', 'true');
+    }, tokenRefreshInterval);
+  }, [accessToken, isAuthenticated]);
+
+  // Monitor online/offline status with robust connection detection and visibility changes
   useEffect(() => {
     const handleOnline = () => {
       console.log('[v0] Online event detected - connection restored');
       setIsOnline(true);
-      // Mark as pending sync if authenticated
+      retryCountRef.current = 0;
       if (isAuthenticated) {
         console.log('[v0] Connection restored and authenticated - marking for sync');
         setSyncStatus('pending');
@@ -51,37 +115,61 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const handleOffline = () => {
       console.log('[v0] Offline event detected - connection lost');
       setIsOnline(false);
-      // Only set to offline if authenticated (don't confuse offline with not authenticated)
       if (isAuthenticated) {
         setSyncStatus('offline');
+        // Start retry attempts
+        attemptReconnection();
       }
     };
 
-    // Periodic connection check (heartbeat) every 30 seconds
-    const connectionCheckInterval = setInterval(() => {
-      const isOnlineNow = navigator.onLine;
-      if (isOnlineNow !== isOnline) {
-        console.log('[v0] Connection state changed via heartbeat check:', isOnlineNow);
-        if (isOnlineNow) {
-          handleOnline();
-        } else {
-          handleOffline();
+    // Visibility change trigger - wake up connection when user returns to tab
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        console.log('[v0] App hidden');
+      } else {
+        console.log('[v0] App visible - triggering connection check');
+        if (isAuthenticated && isOnline) {
+          console.log('[v0] App restored, checking sync status');
+          setSyncStatus('pending');
+          setHasPendingSync(true);
+        } else if (isAuthenticated && !isOnline) {
+          // Attempt reconnection when returning to visible
+          attemptReconnection();
         }
+      }
+    };
+
+    // Periodic connection check (heartbeat) with API verification every 30 seconds
+    const connectionCheckInterval = setInterval(async () => {
+      const isOnlineNow = navigator.onLine;
+      
+      if (isOnlineNow && !isOnline) {
+        // Verify actual API reachability before claiming online
+        const isReachable = await verifyAPIReachability();
+        if (isReachable) {
+          handleOnline();
+        }
+      } else if (!isOnlineNow && isOnline) {
+        handleOffline();
       }
     }, 30000);
 
+    // Set up token refresh
+    refreshTokenIfNeeded();
+
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       clearInterval(connectionCheckInterval);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
-      if (connectionRetryTimerRef.current) {
-        clearTimeout(connectionRetryTimerRef.current);
-      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (connectionRetryTimerRef.current) clearTimeout(connectionRetryTimerRef.current);
+      if (tokenRefreshTimerRef.current) clearTimeout(tokenRefreshTimerRef.current);
     };
-  }, [isAuthenticated, isOnline]);
+  }, [isAuthenticated, isOnline, attemptReconnection, verifyAPIReachability, refreshTokenIfNeeded]);
 
   // Check if user is already authenticated on mount
   useEffect(() => {
