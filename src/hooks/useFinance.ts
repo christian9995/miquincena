@@ -4,307 +4,236 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Transaction, Budgets, TransactionType } from '@/types';
 import { getCurrentPeriodIndex, getPeriodDates } from '@/lib/finance-utils';
 import { useGoogleAuth } from '@/context/GoogleAuthContext';
-import { saveAppStateToDrive, loadAppStateFromDrive } from '@/lib/google-drive';
+import { loadAppStateFromDrive, saveAppStateToDrive } from '@/lib/google-drive';
 import { resolveSyncConflict } from '@/lib/sync-manager';
 
-// Storage keys for persistent data
 const STORAGE_KEY_TRANSACTIONS = 'finanzas_v2026';
 const STORAGE_KEY_BUDGETS = 'presupuestos_v2026';
 const STORAGE_KEY_SEED_DATE = 'fecha_semilla_2026';
 const STORAGE_KEY_TIMESTAMP = 'app_state_timestamp';
 const SYNC_DEBOUNCE_MS = 3000;
 
-export function useFinance() {
+// Safe storage helpers for SSR
+const getFromStorage = (key: string): string | null => {
+    if (typeof window === 'undefined') return null;
+    try {
+        return localStorage.getItem(key);
+    } catch {
+        return null;
+    }
+};
+
+const setToStorage = (key: string, value: string): void => {
+    if (typeof window === 'undefined') return;
+    try {
+        localStorage.setItem(key, value);
+    } catch {
+        // Silently fail if storage is unavailable
+    }
+};
+
+export const useFinance = () => {
+    const { isAuthenticated, accessToken, isOnline, updateSyncStatus } = useGoogleAuth();
+    
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [budgets, setBudgets] = useState<Budgets>({});
     const [currentPeriodIndex, setCurrentPeriodIndex] = useState(0);
-    const [isInitialized, setIsInitialized] = useState(false);
     const [seedDate, setSeedDate] = useState('2026-01-02');
+    const [isInitialized, setIsInitialized] = useState(false);
     
-    const { isAuthenticated, accessToken, updateSyncStatus, isOnline } = useGoogleAuth();
     const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Helper to safely get from localStorage (guards against SSR)
-    const getFromStorage = useCallback((key: string): string | null => {
-        if (typeof window === 'undefined') return null;
-        try {
-            return localStorage.getItem(key);
-        } catch (err) {
-            console.error('[v0] Error reading from localStorage:', err);
-            return null;
-        }
-    }, []);
-
-    // Helper to safely set to localStorage (guards against SSR)
-    const setToStorage = useCallback((key: string, value: string): void => {
-        if (typeof window === 'undefined') return;
-        try {
-            localStorage.setItem(key, value);
-        } catch (err) {
-            console.error('[v0] Error writing to localStorage:', err);
-        }
-    }, []);
-
-    /**
-     * Load data from localStorage and optionally sync with Google Drive
-     * Implements Local-First strategy: local data always saves first
-     */
+    // Initialize app on mount
     useEffect(() => {
         const initializeApp = async () => {
-            // Skip if not in browser
-            if (typeof window === 'undefined') return;
-
-            // Step 1: Always load from localStorage first (Offline-First)
-            loadFromLocalStorage();
-            
-            // Step 2: If authenticated, online, and have a token, attempt Drive sync
-            if (isAuthenticated && accessToken && isOnline) {
-                await syncWithDriveOnInit();
+            try {
+                // Load from localStorage first (Offline-First)
+                loadFromLocalStorage();
+                
+                // Try to sync with Drive if authenticated and online
+                if (isAuthenticated && accessToken && isOnline) {
+                    await syncWithDriveOnInit();
+                }
+            } catch (err) {
+                console.error('[v0] Error initializing app:', err);
+                loadFromLocalStorage();
+            } finally {
+                setIsInitialized(true);
             }
-
-            setIsInitialized(true);
         };
 
         const loadFromLocalStorage = () => {
-            try {
-                const savedTransactions = getFromStorage(STORAGE_KEY_TRANSACTIONS);
-                const savedBudgets = getFromStorage(STORAGE_KEY_BUDGETS);
-                const savedSeedDate = getFromStorage(STORAGE_KEY_SEED_DATE);
+            const savedTransactions = getFromStorage(STORAGE_KEY_TRANSACTIONS);
+            const savedBudgets = getFromStorage(STORAGE_KEY_BUDGETS);
+            const savedSeedDate = getFromStorage(STORAGE_KEY_SEED_DATE);
 
-                if (savedTransactions) {
+            if (savedTransactions) {
+                try {
                     setTransactions(JSON.parse(savedTransactions));
+                } catch (e) {
+                    console.error('[v0] Error parsing transactions:', e);
                 }
+            }
 
-                if (savedBudgets) {
+            if (savedBudgets) {
+                try {
                     setBudgets(JSON.parse(savedBudgets));
+                } catch (e) {
+                    console.error('[v0] Error parsing budgets:', e);
                 }
+            }
 
-                if (savedSeedDate) {
-                    setSeedDate(savedSeedDate);
-                    const todayPeriodIndex = getCurrentPeriodIndex(new Date(), savedSeedDate);
-                    setCurrentPeriodIndex(todayPeriodIndex);
-                } else {
-                    const todayPeriodIndex = getCurrentPeriodIndex(new Date(), '2026-01-02');
-                    setCurrentPeriodIndex(todayPeriodIndex);
-                }
-            } catch (err) {
-                console.error('[v0] Error loading from localStorage:', err);
+            if (savedSeedDate) {
+                setSeedDate(savedSeedDate);
+                const todayPeriodIndex = getCurrentPeriodIndex(new Date(), savedSeedDate);
+                setCurrentPeriodIndex(todayPeriodIndex);
+            } else {
+                const todayPeriodIndex = getCurrentPeriodIndex(new Date(), '2026-01-02');
+                setCurrentPeriodIndex(todayPeriodIndex);
             }
         };
 
         const syncWithDriveOnInit = async () => {
             try {
-                console.log('[v0] Attempting to load from Google Drive on init');
+                console.log('[v0] Attempting to sync with Google Drive');
                 
-                // Get the data we just loaded from localStorage
-                const localTimestamp = getFromStorage(STORAGE_KEY_TIMESTAMP);
-                const localTs = localTimestamp ? parseInt(localTimestamp) : 0;
-                
-                // Try to load from Drive
                 const driveData = await loadAppStateFromDrive(accessToken!);
-                
-                if (driveData) {
-                    const driveTs = driveData.timestamp || 0;
-                    
-                    // Local-First Decision: if local is newer, keep it
-                    if (localTs >= driveTs) {
-                        console.log('[v0] Local data is newer/equal - keeping local');
-                        updateSyncStatus(false, 'pending');
-                    } else {
-                        console.log('[v0] Drive data is newer - merging');
-                        setTransactions(driveData.transactions);
-                        setBudgets(driveData.budgets);
-                        setSeedDate(driveData.seedDate);
-                        setToStorage(STORAGE_KEY_TIMESTAMP, driveTs.toString());
-                        updateSyncStatus(false, 'synced');
-                    }
-                    
-                    // Always set current period to today
-                    const todayPeriodIndex = getCurrentPeriodIndex(
-                        new Date(),
-                        driveData.seedDate || '2026-01-02'
-                    );
-                    setCurrentPeriodIndex(todayPeriodIndex);
-                } else {
-                    console.log('[v0] No data in Google Drive');
+                if (!driveData) {
+                    console.log('[v0] No Drive data available');
                     updateSyncStatus(false, 'pending');
+                    return;
                 }
+
+                // Local-First: Compare timestamps
+                const localTs = getFromStorage(STORAGE_KEY_TIMESTAMP) 
+                    ? parseInt(getFromStorage(STORAGE_KEY_TIMESTAMP)!) 
+                    : 0;
+                const driveTs = driveData.timestamp || 0;
+
+                if (localTs >= driveTs) {
+                    console.log('[v0] Local data is newer - keeping local');
+                    updateSyncStatus(false, 'pending');
+                } else {
+                    console.log('[v0] Drive data is newer - merging');
+                    const merged = resolveSyncConflict(
+                        { transactions, budgets, seedDate, timestamp: localTs },
+                        driveData
+                    );
+                    setTransactions(merged.transactions);
+                    setBudgets(merged.budgets);
+                    setSeedDate(merged.seedDate);
+                    setToStorage(STORAGE_KEY_TIMESTAMP, merged.timestamp.toString());
+                    updateSyncStatus(false, 'synced');
+                }
+
+                const todayPeriodIndex = getCurrentPeriodIndex(new Date(), driveData.seedDate || seedDate);
+                setCurrentPeriodIndex(todayPeriodIndex);
             } catch (err) {
                 if (err instanceof Error) {
                     if (err.message === 'TOKEN_EXPIRED') {
-                        console.error('[v0] Token expired - triggering re-authentication');
+                        console.error('[v0] Token expired during sync');
                         setToStorage('google_token_expired', 'true');
                         updateSyncStatus(false, 'error');
                     } else {
                         console.log('[v0] Drive sync failed:', err.message);
                         updateSyncStatus(false, 'offline');
                     }
-                } else {
-                    console.error('[v0] Unknown error during Drive sync:', err);
-                    updateSyncStatus(false, 'offline');
                 }
             }
         };
 
         initializeApp();
-    }, [isAuthenticated, accessToken, isOnline, updateSyncStatus, getFromStorage, setToStorage]);
+    }, [isAuthenticated, accessToken, isOnline, updateSyncStatus]);
 
-    /**
-     * Save to localStorage immediately (Offline-First)
-     * Queue sync to Google Drive with Local-First validation
-     */
+    // Save to localStorage and queue Drive sync
     useEffect(() => {
-        if (!isInitialized || typeof window === 'undefined') return;
+        if (!isInitialized) return;
 
-        // ALWAYS save to localStorage first with new timestamp
-        const now = Date.now();
+        // ALWAYS save to localStorage with timestamp
         setToStorage(STORAGE_KEY_TRANSACTIONS, JSON.stringify(transactions));
         setToStorage(STORAGE_KEY_BUDGETS, JSON.stringify(budgets));
         setToStorage(STORAGE_KEY_SEED_DATE, seedDate);
-        setToStorage(STORAGE_KEY_TIMESTAMP, now.toString());
+        setToStorage(STORAGE_KEY_TIMESTAMP, Date.now().toString());
 
-        console.log('[v0] Data saved to localStorage with timestamp:', now);
+        // Queue Drive sync if authenticated and online
+        if (isAuthenticated && accessToken && isOnline) {
+            if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
 
-        // If authenticated and online, queue sync to Drive
-        if (!isAuthenticated || !accessToken || !isOnline) {
-            if (!isOnline && isAuthenticated) {
-                updateSyncStatus(false, 'pending');
-            }
-            return;
+            syncTimeoutRef.current = setTimeout(async () => {
+                try {
+                    updateSyncStatus(true);
+                    const appState = { transactions, budgets, seedDate, timestamp: Date.now() };
+                    await saveAppStateToDrive(accessToken, appState);
+                    updateSyncStatus(false, 'synced');
+                } catch (err) {
+                    if (err instanceof Error && err.message === 'TOKEN_EXPIRED') {
+                        console.error('[v0] Token expired during save');
+                        setToStorage('google_token_expired', 'true');
+                        updateSyncStatus(false, 'error');
+                    } else {
+                        console.log('[v0] Drive save failed, data kept locally');
+                        updateSyncStatus(false, 'offline');
+                    }
+                }
+            }, SYNC_DEBOUNCE_MS);
         }
-
-        console.log('[v0] Queuing Drive sync (authenticated, token exists, online)');
-        updateSyncStatus(true);
-
-        if (syncTimeoutRef.current) {
-            clearTimeout(syncTimeoutRef.current);
-        }
-
-        syncTimeoutRef.current = setTimeout(async () => {
-            await performDriveSync(now);
-        }, SYNC_DEBOUNCE_MS);
 
         return () => {
-            if (syncTimeoutRef.current) {
-                clearTimeout(syncTimeoutRef.current);
-            }
+            if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
         };
-    }, [transactions, budgets, seedDate, isInitialized, isAuthenticated, accessToken, isOnline, updateSyncStatus, setToStorage]);
+    }, [transactions, budgets, seedDate, isAuthenticated, accessToken, isOnline, isInitialized, updateSyncStatus]);
 
-    /**
-     * Perform the actual Drive sync with Local-First validation
-     */
-    const performDriveSync = useCallback(async (localTimestamp: number) => {
-        try {
-            if (!accessToken || accessToken.length < 10) {
-                console.error('[v0] Invalid token for sync');
-                updateSyncStatus(false, 'offline');
-                return;
-            }
-
-            console.log('[v0] Starting Drive sync with Local-First strategy');
-            
-            const appState = {
-                transactions,
-                budgets,
-                seedDate,
-                timestamp: localTimestamp,
-            };
-
-            // Local-First: Always upload local data first
-            try {
-                await saveAppStateToDrive(accessToken, appState);
-                console.log('[v0] Drive sync completed successfully');
-                updateSyncStatus(false, 'synced');
-            } catch (driveErr) {
-                // Handle 401 token expiration
-                if (driveErr instanceof Error && driveErr.message === 'TOKEN_EXPIRED') {
-                    console.error('[v0] Token expired during sync - triggering re-authentication');
-                    setToStorage('google_token_expired', 'true');
-                    updateSyncStatus(false, 'error');
-                } else {
-                    console.error('[v0] Drive sync failed:', driveErr);
-                    console.log('[v0] Data is safe in localStorage, will retry later');
-                    updateSyncStatus(false, 'offline');
-                }
-            }
-        } catch (err) {
-            console.error('[v0] Unexpected error in Drive sync:', err);
-            updateSyncStatus(false, 'offline');
-        }
-    }, [accessToken, transactions, budgets, seedDate, updateSyncStatus, setToStorage]);
-
-    /**
-     * Memoized current period calculations
-     */
+    // Get current period data
     const currentPeriodData = useMemo(() => {
-        const { start, end } = getPeriodDates(currentPeriodIndex, seedDate);
-
-        const mapped = transactions.map((t, index) => ({ ...t, originalIndex: index }));
-
-        const filtered = mapped.filter((t) => {
-            const tDate = new Date(t.date + 'T00:00:00');
-            return tDate >= start && tDate <= end;
-        });
-
-        const income = filtered
-            .filter((t) => t.type === 'ingreso')
-            .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+        if (transactions.length === 0) return { transactions: [], budgets: {} };
         
-        const expenses = filtered
-            .filter((t) => t.type === 'egreso')
-            .reduce((sum, t) => sum + Number(t.amount || 0), 0);
-
-        const categoryTotals: Record<string, number> = {};
-        filtered.forEach((t) => {
-            if (t.type === 'egreso') {
-                categoryTotals[t.category] = (categoryTotals[t.category] || 0) + Number(t.amount || 0);
-            }
+        const dates = getPeriodDates(currentPeriodIndex, seedDate);
+        const periodTransactions = transactions.filter(t => {
+            const tDate = new Date(t.date);
+            return tDate >= dates.start && tDate <= dates.end;
         });
 
         return {
-            transactions: filtered,
-            income,
-            expenses,
-            net: income - expenses,
-            categoryTotals,
-            budget: budgets[currentPeriodIndex] || { income: 0, expense: 0 },
-            start,
-            end,
+            transactions: periodTransactions,
+            budgets: budgets || {},
         };
-    }, [transactions, budgets, currentPeriodIndex, seedDate]);
+    }, [transactions, currentPeriodIndex, seedDate, budgets]);
 
-    // Transaction management functions
-    const addTransaction = (t: Transaction) => {
-        setTransactions((prev) => [...prev, t]);
-    };
+    // Transaction management
+    const addTransaction = useCallback((transaction: Omit<Transaction, 'id'>) => {
+        const newTransaction: Transaction = {
+            ...transaction,
+            id: Date.now().toString(),
+        };
+        setTransactions(prev => [...prev, newTransaction]);
+    }, []);
 
-    const updateTransaction = (index: number, updated: Transaction) => {
-        setTransactions((prev) => {
-            const next = [...prev];
-            next[index] = updated;
-            return next;
+    const updateTransaction = useCallback((id: string, updates: Partial<Transaction>) => {
+        setTransactions(prev =>
+            prev.map(t => (t.id === id ? { ...t, ...updates } : t))
+        );
+    }, []);
+
+    const deleteTransaction = useCallback((id: string) => {
+        setTransactions(prev => prev.filter(t => t.id !== id));
+    }, []);
+
+    // Budget management
+    const updateBudget = useCallback((category: string, amount: number) => {
+        setBudgets(prev => ({
+            ...prev,
+            [category]: amount,
+        }));
+    }, []);
+
+    // Navigation
+    const navigatePeriod = useCallback((direction: 'prev' | 'next') => {
+        setCurrentPeriodIndex(prev => {
+            if (direction === 'prev' && prev > 0) return prev - 1;
+            if (direction === 'next') return prev + 1;
+            return prev;
         });
-    };
-
-    const deleteTransaction = (index: number) => {
-        setTransactions((prev) => prev.filter((_, i) => i !== index));
-    };
-
-    const updateBudget = (periodIndex: number, budget: { income: number; expense: number }) => {
-        setBudgets((prev) => ({ ...prev, [periodIndex]: budget }));
-    };
-
-    const navigatePeriod = (direction: 'prev' | 'next') => {
-        setCurrentPeriodIndex((prev) => {
-            const totalPeriods = 26; // Number of bi-weekly periods in a year
-            if (direction === 'prev') {
-                return prev > 0 ? prev - 1 : 0;
-            } else {
-                return prev < totalPeriods - 1 ? prev + 1 : totalPeriods - 1;
-            }
-        });
-    };
+    }, []);
 
     return {
         // State
@@ -324,7 +253,7 @@ export function useFinance() {
         setCurrentPeriodIndex,
         setSeedDate,
         
-        // Aliases for backwards compatibility
+        // Backwards compatibility
         saveBudget: updateBudget,
         clearAll: () => {
             setTransactions([]);
@@ -333,4 +262,4 @@ export function useFinance() {
             setToStorage(STORAGE_KEY_BUDGETS, '{}');
         },
     };
-}
+};

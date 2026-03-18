@@ -152,6 +152,36 @@ class SyncManager {
     console.log('[v0] Sync direction: SKIP (timestamps too close)');
     return 'skip';
   }
+}
+
+// Export standalone function for easier use in google-drive.ts
+export function determineSyncDirection(
+  localTimestamp: number,
+  remoteTimestamp: number,
+  remoteModifiedTime?: string
+): 'upload' | 'download' | 'skip' {
+  const remoteModified = remoteModifiedTime ? new Date(remoteModifiedTime).getTime() : remoteTimestamp;
+  const timeDiff = remoteModified - localTimestamp;
+
+  console.log('[v0] Determining sync direction');
+  console.log('[v0] Time difference (remote - local):', timeDiff, 'ms');
+
+  // Local is newer: upload
+  if (localTimestamp >= remoteModified) {
+    console.log('[v0] Sync direction: UPLOAD (local is newer or equal)');
+    return 'upload';
+  }
+
+  // Remote is significantly newer: download
+  if (timeDiff > 5000) {
+    console.log('[v0] Sync direction: DOWNLOAD (remote is significantly newer)');
+    return 'download';
+  }
+
+  // Very close timestamps: skip to avoid thrashing
+  console.log('[v0] Sync direction: SKIP (timestamps too close)');
+  return 'skip';
+}
 
   /**
    * Force immediate sync
