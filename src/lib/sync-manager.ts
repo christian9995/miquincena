@@ -1,16 +1,11 @@
-/**
- * Sync Manager - Clean Implementation
- * Orchestrates local/remote sync with Local-First conflict resolution
- */
-
 import { AppState } from './google-drive';
 
 /**
- * Local-First Sync Strategy:
+ * Local-First Sync Strategy
  * 1. Compare timestamps BEFORE any data transfer
- * 2. If local is newer: Keep local (will upload)
- * 3. If remote is newer: Use remote (will download)
- * 4. If equal: Keep local (user's current session wins)
+ * 2. If local is newer: keep local (will be uploaded)
+ * 3. If remote is newer: use remote
+ * 4. If equal or close: keep local (safe default)
  */
 export function resolveSyncConflict(
   local: AppState,
@@ -25,23 +20,25 @@ export function resolveSyncConflict(
   console.log('[v0] Local timestamp:', localTimestamp);
   console.log('[v0] Remote timestamp:', remoteModified);
 
+  // Local is newer or equal: keep local (Local-First priority)
   if (localTimestamp >= remoteModified) {
-    console.log('[v0] Local data is newer or equal - keeping local');
+    console.log('[v0] Local data is newer - LOCAL-FIRST strategy applies');
     return local;
   }
 
+  // Remote is significantly newer (more than 5 seconds): use remote
   if (remoteModified > localTimestamp + 5000) {
     console.log('[v0] Remote data is significantly newer, using remote');
     return remote;
   }
 
+  // Default: keep local (safe default for conflicts)
   console.log('[v0] Timestamps too close, keeping local data');
   return local;
 }
 
 /**
- * Determine sync direction based on timestamps (Local-First)
- * Named export for use in google-drive.ts
+ * Determine sync direction based on timestamps
  */
 export function determineSyncDirection(
   localTimestamp: number,
@@ -51,25 +48,30 @@ export function determineSyncDirection(
   const remoteModified = remoteModifiedTime ? new Date(remoteModifiedTime).getTime() : remoteTimestamp;
   const timeDiff = remoteModified - localTimestamp;
 
+  console.log('[v0] Determining sync direction. Time diff (remote - local):', timeDiff, 'ms');
+
+  // Local is newer: upload
   if (localTimestamp >= remoteModified) {
+    console.log('[v0] Sync direction: UPLOAD (local is newer or equal)');
     return 'upload';
   }
 
+  // Remote is significantly newer: download
   if (timeDiff > 5000) {
+    console.log('[v0] Sync direction: DOWNLOAD (remote is significantly newer)');
     return 'download';
   }
 
+  // Very close timestamps: skip to avoid thrashing
+  console.log('[v0] Sync direction: SKIP (timestamps too close)');
   return 'skip';
 }
 
-interface SyncQueueItem {
-  operation: 'save' | 'load';
-  timestamp: number;
-  retries: number;
-}
-
-class SyncManager {
-  private syncQueue: SyncQueueItem[] = [];
+/**
+ * Sync Manager Class for queue management
+ */
+export class SyncManager {
+  private syncQueue: Array<{ operation: 'save' | 'load'; timestamp: number; retries: number }> = [];
   private isSyncing = false;
   private syncDebounceTimer: NodeJS.Timeout | null = null;
   private readonly SYNC_DEBOUNCE_MS = 2000;
@@ -106,7 +108,11 @@ class SyncManager {
         if (!item) break;
 
         try {
-          console.log('[v0] Processing sync operation:', item.operation);
+          if (item.operation === 'save') {
+            console.log('[v0] Processing save operation');
+          } else if (item.operation === 'load') {
+            console.log('[v0] Processing load operation');
+          }
         } catch (err) {
           if (item.retries < this.MAX_RETRIES) {
             item.retries++;
@@ -123,7 +129,7 @@ class SyncManager {
     }
   }
 
-  async forceSync(): Promise<void> {
+  forceSync(): void {
     console.log('[v0] Force sync requested');
     this.syncQueue = [];
 
@@ -131,12 +137,7 @@ class SyncManager {
       clearTimeout(this.syncDebounceTimer);
     }
 
-    this.isSyncing = true;
-    try {
-      console.log('[v0] Force sync initiated');
-    } finally {
-      this.isSyncing = false;
-    }
+    this.isSyncing = false;
   }
 
   getSyncStatus(): { isSyncing: boolean; queueLength: number } {
