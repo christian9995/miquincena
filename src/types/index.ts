@@ -1,6 +1,7 @@
 export type TransactionType = 'ingreso' | 'egreso';
 
 export interface Transaction {
+    id: string; // Unique identifier for transaction identity-based merging
     desc: string;
     amount: number | string;
     date: string;
