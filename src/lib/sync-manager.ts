@@ -1,30 +1,46 @@
 /**
  * Sync Manager
- * Orchestrates local/remote sync with conflict resolution
+ * Orchestrates local/remote sync with Local-First conflict resolution
  */
 
 import { AppState } from './google-drive';
 
-// Re-export the conflict resolver at the top level for easier imports
+/**
+ * Local-First Sync Strategy:
+ * 1. Compare timestamps BEFORE any data transfer
+ * 2. If local is newer: Upload local first, then confirm with Drive
+ * 3. If remote is newer: Download, but preserve local if user modified during reconnect
+ * 4. If equal: Keep local (user's current session wins)
+ */
 export function resolveSyncConflict(
   local: AppState,
-  remote: AppState
+  remote: AppState,
+  remoteModifiedTime?: string
 ): AppState {
-  const localTimestamp = local.timestamp || 0;
-  const remoteTimestamp = remote.timestamp || 0;
+  const localTimestamp = typeof local.timestamp === 'number' ? local.timestamp : 0;
+  const remoteTimestamp = typeof remote.timestamp === 'number' ? remote.timestamp : 0;
+  const remoteModified = remoteModifiedTime ? new Date(remoteModifiedTime).getTime() : remoteTimestamp;
 
-  console.log('[v0] Resolving sync conflict');
-  console.log('[v0] Local timestamp:', localTimestamp);
-  console.log('[v0] Remote timestamp:', remoteTimestamp);
+  console.log('[v0] Resolving sync conflict with Local-First strategy');
+  console.log('[v0] Local timestamp:', localTimestamp, new Date(localTimestamp).toISOString());
+  console.log('[v0] Remote timestamp:', remoteTimestamp, new Date(remoteTimestamp).toISOString());
+  console.log('[v0] Remote modified:', remoteModified, new Date(remoteModified).toISOString());
 
-  // Remote is newer: use remote data
-  if (remoteTimestamp > localTimestamp) {
-    console.log('[v0] Remote data is newer, using remote');
+  // Local is newer or equal: keep local (Local-First priority)
+  if (localTimestamp >= remoteModified) {
+    console.log('[v0] Local data is newer or equal - LOCAL-FIRST strategy applies');
+    console.log('[v0] Local data will be uploaded to Drive');
+    return local;
+  }
+
+  // Remote is significantly newer (more than 5 seconds): use remote
+  if (remoteModified > localTimestamp + 5000) {
+    console.log('[v0] Remote data is significantly newer, using remote');
     return remote;
   }
 
-  // Local is newer or equal: use local data
-  console.log('[v0] Local data is newer or equal, using local');
+  // Default: keep local (safe default for conflicts)
+  console.log('[v0] Timestamps too close or unclear, keeping local data');
   return local;
 }
 
@@ -106,44 +122,35 @@ class SyncManager {
   }
 
   /**
-   * Merge local and remote data, resolving conflicts based on timestamps
+   * Determine sync direction based on timestamps (Local-First)
+   * Returns: 'upload' if local is newer, 'download' if remote is newer, 'skip' if no sync needed
    */
-  mergeConflict(local: AppState, remote: AppState): AppState {
-    const localTimestamp = new Date(local.timestamp).getTime();
-    const remoteTimestamp = new Date(remote.timestamp).getTime();
+  determineSyncDirection(
+    localTimestamp: number,
+    remoteTimestamp: number,
+    remoteModifiedTime?: string
+  ): 'upload' | 'download' | 'skip' {
+    const remoteModified = remoteModifiedTime ? new Date(remoteModifiedTime).getTime() : remoteTimestamp;
+    const timeDiff = remoteModified - localTimestamp;
 
-    console.log('[v0] Resolving sync conflict');
-    console.log('[v0] Local timestamp:', local.timestamp);
-    console.log('[v0] Remote timestamp:', remote.timestamp);
+    console.log('[v0] Determining sync direction');
+    console.log('[v0] Time difference (remote - local):', timeDiff, 'ms');
 
-    // Remote is newer: use remote data
-    if (remoteTimestamp > localTimestamp) {
-      console.log('[v0] Remote data is newer, using remote');
-      return remote;
+    // Local is newer: upload
+    if (localTimestamp >= remoteModified) {
+      console.log('[v0] Sync direction: UPLOAD (local is newer or equal)');
+      return 'upload';
     }
 
-    // Local is newer or equal: use local data
-    console.log('[v0] Local data is newer or equal, using local');
-    return local;
-  }
-
-  /**
-   * Compare sync timestamps and determine if sync is needed
-   */
-  shouldSync(localTimestamp: string, remoteTimestamp: string | null): boolean {
-    if (!remoteTimestamp) {
-      console.log('[v0] No remote timestamp, sync needed');
-      return true;
+    // Remote is significantly newer: download
+    if (timeDiff > 5000) {
+      console.log('[v0] Sync direction: DOWNLOAD (remote is significantly newer)');
+      return 'download';
     }
 
-    const localTime = new Date(localTimestamp).getTime();
-    const remoteTime = new Date(remoteTimestamp).getTime();
-
-    // If remote is significantly newer (more than 5 seconds), sync needed
-    const shouldSync = remoteTime > localTime + 5000;
-    console.log('[v0] Should sync:', shouldSync);
-
-    return shouldSync;
+    // Very close timestamps: skip to avoid thrashing
+    console.log('[v0] Sync direction: SKIP (timestamps too close)');
+    return 'skip';
   }
 
   /**

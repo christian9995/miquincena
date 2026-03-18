@@ -40,13 +40,18 @@ export function useFinance() {
                                 transactions: JSON.parse(localStorage.getItem(STORAGE_KEY_TRANSACTIONS) || '[]'),
                                 budgets: JSON.parse(localStorage.getItem(STORAGE_KEY_BUDGETS) || '{}'),
                                 seedDate: localStorage.getItem(STORAGE_KEY_SEED_DATE) || '2026-01-02',
-                                timestamp: 0,
+                                timestamp: localStorage.getItem('app_state_timestamp') ? parseInt(localStorage.getItem('app_state_timestamp') || '0') : 0,
                             };
                             
+                            // Local-First: Use Local-First strategy to decide sync direction
                             const merged = resolveSyncConflict(localState, driveData);
                             setTransactions(merged.transactions);
                             setBudgets(merged.budgets);
                             setSeedDate(merged.seedDate);
+                            
+                            // Store timestamp for future sync decisions
+                            localStorage.setItem('app_state_timestamp', merged.timestamp.toString());
+                            
                             updateSyncStatus(false, 'synced');
                             
                             // After merging, set current period based on today's date
@@ -57,10 +62,16 @@ export function useFinance() {
                             updateSyncStatus(false, 'pending');
                         }
                     } catch (driveErr) {
-                        console.log('[v0] Google Drive sync not available - using localStorage only');
-                        console.log('[v0] Note: Google Drive sync requires proper OAuth 2.0 Authorization Code Flow with drive.appdata scope');
-                        updateSyncStatus(false, 'offline');
+                        if (driveErr instanceof Error && driveErr.message === 'TOKEN_EXPIRED') {
+                            console.error('[v0] Token expired during initialization');
+                            localStorage.setItem('google_token_expired', 'true');
+                            updateSyncStatus(false, 'error');
+                        } else {
+                            console.log('[v0] Google Drive sync not available - using localStorage only');
+                            updateSyncStatus(false, 'offline');
+                        }
                     }
+                }
                 }
             } catch (err) {
                 console.error('[v0] Error initializing app:', err);
@@ -111,12 +122,13 @@ export function useFinance() {
     useEffect(() => {
         if (!isInitialized) return;
 
-        // ALWAYS save to localStorage first
+        // ALWAYS save to localStorage first with timestamp
         localStorage.setItem(STORAGE_KEY_TRANSACTIONS, JSON.stringify(transactions));
         localStorage.setItem(STORAGE_KEY_BUDGETS, JSON.stringify(budgets));
         localStorage.setItem(STORAGE_KEY_SEED_DATE, seedDate);
+        localStorage.setItem('app_state_timestamp', Date.now().toString());
         
-        console.log('[v0] Data saved to localStorage');
+        console.log('[v0] Data saved to localStorage with timestamp:', Date.now());
 
         // If authenticated and online, queue sync to Drive
         if (isAuthenticated && accessToken && isOnline) {
@@ -139,19 +151,52 @@ export function useFinance() {
                     }
 
                     updateSyncStatus(true);
-                    console.log('[v0] Starting Drive sync with token');
-                    await saveAppStateToDrive(accessToken, {
+                    console.log('[v0] Starting Drive sync with Local-First strategy');
+                    
+                    const appState = {
                         transactions,
                         budgets,
                         seedDate,
                         timestamp: Date.now(),
-                    });
+                    };
+
+                    // Get remote timestamp to decide sync direction
+                    try {
+                        const { getRemoteFileTimestamp } = await import('@/lib/google-drive');
+                        const remoteModified = await getRemoteFileTimestamp(accessToken);
+                        
+                        if (remoteModified) {
+                          console.log('[v0] Remote file timestamp:', remoteModified);
+                          // Local data is always newer or equal (just created), so upload it
+                          await saveAppStateToDrive(accessToken, appState);
+                        } else {
+                          // No remote file, just save
+                          await saveAppStateToDrive(accessToken, appState);
+                        }
+                    } catch (err) {
+                        if (err instanceof Error && err.message === 'TOKEN_EXPIRED') {
+                            console.error('[v0] OAuth2 token expired - marking for re-authentication');
+                            updateSyncStatus(false, 'error');
+                            // Signal that user needs to re-authenticate
+                            localStorage.setItem('google_token_expired', 'true');
+                            return;
+                        }
+                        throw err;
+                    }
+                    
                     updateSyncStatus(false, 'synced');
                     console.log('[v0] Drive sync completed successfully');
                 } catch (err) {
                     console.error('[v0] Error syncing to Drive:', err);
-                    console.log('[v0] Falling back to localStorage - data is safe locally');
-                    updateSyncStatus(false, 'offline');
+                    
+                    if (err instanceof Error && err.message === 'TOKEN_EXPIRED') {
+                        console.error('[v0] Token expired during sync');
+                        updateSyncStatus(false, 'error');
+                        localStorage.setItem('google_token_expired', 'true');
+                    } else {
+                        console.log('[v0] Falling back to localStorage - data is safe locally');
+                        updateSyncStatus(false, 'offline');
+                    }
                 }
             }, SYNC_DEBOUNCE_MS);
         } else if (!isOnline && isAuthenticated) {
