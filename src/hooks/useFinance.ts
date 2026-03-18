@@ -72,7 +72,6 @@ export function useFinance() {
                         }
                     }
                 }
-                }
             } catch (err) {
                 console.error('[v0] Error initializing app:', err);
                 loadFromLocalStorage();
