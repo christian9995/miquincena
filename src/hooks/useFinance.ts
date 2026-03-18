@@ -183,9 +183,18 @@ export const useFinance = () => {
         };
     }, [transactions, budgets, seedDate, isAuthenticated, accessToken, isOnline, isInitialized, updateSyncStatus]);
 
-    // Get current period data
+    // Get current period data with computed values
     const currentPeriodData = useMemo(() => {
-        if (transactions.length === 0) return { transactions: [], budgets: {} };
+        if (transactions.length === 0) {
+            return {
+                transactions: [],
+                income: 0,
+                expenses: 0,
+                net: 0,
+                budget: { income: 0, expense: 0 },
+                categoryTotals: {},
+            };
+        }
         
         const dates = getPeriodDates(currentPeriodIndex, seedDate);
         const periodTransactions = transactions.filter(t => {
@@ -193,9 +202,29 @@ export const useFinance = () => {
             return tDate >= dates.start && tDate <= dates.end;
         });
 
+        // Calculate income and expenses
+        let totalIncome = 0;
+        let totalExpenses = 0;
+        const categories: Record<string, number> = {};
+
+        periodTransactions.forEach(t => {
+            if (t.type === 'income') {
+                totalIncome += t.amount;
+            } else {
+                totalExpenses += t.amount;
+                categories[t.category] = (categories[t.category] || 0) + t.amount;
+            }
+        });
+
+        const periodBudget = budgets[currentPeriodIndex] || { income: 0, expense: 0 };
+
         return {
             transactions: periodTransactions,
-            budgets: budgets || {},
+            income: totalIncome,
+            expenses: totalExpenses,
+            net: totalIncome - totalExpenses,
+            budget: periodBudget,
+            categoryTotals: categories,
         };
     }, [transactions, currentPeriodIndex, seedDate, budgets]);
 
