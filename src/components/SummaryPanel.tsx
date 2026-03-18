@@ -1,8 +1,9 @@
+// v1.0.0 - Production Ready SummaryPanel
 'use client';
 
-import { formatCurrency } from '@/lib/finance-utils';
-import BarChart from './Charts/BarChart';
-import PieChart from './Charts/PieChart';
+import { formatCurrency } from '@/lib/format-utils';
+import { BarChart } from './charts/BarChart';
+import { PieChart } from './charts/PieChart';
 
 interface SummaryPanelProps {
     income: number;

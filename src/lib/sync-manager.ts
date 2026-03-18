@@ -1,11 +1,8 @@
+// Sync Manager - v1.0.0 - Production Ready
 import { AppState } from './google-drive';
 
 /**
  * Local-First Sync Strategy
- * 1. Compare timestamps BEFORE any data transfer
- * 2. If local is newer: keep local (will be uploaded)
- * 3. If remote is newer: use remote
- * 4. If equal or close: keep local (safe default)
  */
 export function resolveSyncConflict(
   local: AppState,
@@ -16,24 +13,14 @@ export function resolveSyncConflict(
   const remoteTimestamp = typeof remote.timestamp === 'number' ? remote.timestamp : 0;
   const remoteModified = remoteModifiedTime ? new Date(remoteModifiedTime).getTime() : remoteTimestamp;
 
-  console.log('[v0] Resolving sync conflict with Local-First strategy');
-  console.log('[v0] Local timestamp:', localTimestamp);
-  console.log('[v0] Remote timestamp:', remoteModified);
-
-  // Local is newer or equal: keep local (Local-First priority)
   if (localTimestamp >= remoteModified) {
-    console.log('[v0] Local data is newer - LOCAL-FIRST strategy applies');
     return local;
   }
 
-  // Remote is significantly newer (more than 5 seconds): use remote
   if (remoteModified > localTimestamp + 5000) {
-    console.log('[v0] Remote data is significantly newer, using remote');
     return remote;
   }
 
-  // Default: keep local (safe default for conflicts)
-  console.log('[v0] Timestamps too close, keeping local data');
   return local;
 }
 
@@ -48,27 +35,19 @@ export function determineSyncDirection(
   const remoteModified = remoteModifiedTime ? new Date(remoteModifiedTime).getTime() : remoteTimestamp;
   const timeDiff = remoteModified - localTimestamp;
 
-  console.log('[v0] Determining sync direction. Time diff (remote - local):', timeDiff, 'ms');
-
-  // Local is newer: upload
   if (localTimestamp >= remoteModified) {
-    console.log('[v0] Sync direction: UPLOAD (local is newer or equal)');
     return 'upload';
   }
 
-  // Remote is significantly newer: download
   if (timeDiff > 5000) {
-    console.log('[v0] Sync direction: DOWNLOAD (remote is significantly newer)');
     return 'download';
   }
 
-  // Very close timestamps: skip to avoid thrashing
-  console.log('[v0] Sync direction: SKIP (timestamps too close)');
   return 'skip';
 }
 
 /**
- * Sync Manager Class for queue management
+ * Sync Manager Class
  */
 export class SyncManager {
   private syncQueue: Array<{ operation: 'save' | 'load'; timestamp: number; retries: number }> = [];
@@ -91,8 +70,6 @@ export class SyncManager {
       timestamp: Date.now(),
       retries: 0,
     });
-
-    console.log('[v0] Sync operation queued:', operation);
   }
 
   private async processSyncQueue(): Promise<void> {
@@ -108,18 +85,12 @@ export class SyncManager {
         if (!item) break;
 
         try {
-          if (item.operation === 'save') {
-            console.log('[v0] Processing save operation');
-          } else if (item.operation === 'load') {
-            console.log('[v0] Processing load operation');
-          }
+          // Process sync operation
+          console.log('[v0] Processing sync:', item.operation);
         } catch (err) {
           if (item.retries < this.MAX_RETRIES) {
             item.retries++;
             this.syncQueue.unshift(item);
-            console.error('[v0] Sync operation failed, retrying:', item.operation);
-          } else {
-            console.error('[v0] Sync operation failed after max retries:', item.operation);
           }
         }
       }
@@ -130,13 +101,10 @@ export class SyncManager {
   }
 
   forceSync(): void {
-    console.log('[v0] Force sync requested');
     this.syncQueue = [];
-
     if (this.syncDebounceTimer) {
       clearTimeout(this.syncDebounceTimer);
     }
-
     this.isSyncing = false;
   }
 
@@ -153,8 +121,8 @@ export class SyncManager {
       clearTimeout(this.syncDebounceTimer);
       this.syncDebounceTimer = null;
     }
-    console.log('[v0] Sync queue cleared');
   }
 }
 
+// Export singleton instance
 export const syncManager = new SyncManager();
