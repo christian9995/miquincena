@@ -1,4 +1,3 @@
-// v1.0.2 - Components inlined to bypass module resolution issue
 'use client';
 
 /**
@@ -37,12 +36,12 @@ function BarChart({
         </div>
         <div className="w-full bg-gray-200 rounded-full h-3">
           <div
-            className="bg-green-500 h-3 rounded-full transition-all"
-            style={{ width: `${Math.min(incomePercent, 100)}%` }}
+            className="h-3 rounded-full transition-all"
+            style={{ width: `${Math.min(incomePercent, 100)}%`, backgroundColor: '#10b981' }}
           />
         </div>
         <div className="text-xs text-gray-500 mt-1">
-          ${realIncome.toFixed(2)} de ${metaIncome.toFixed(2)}
+          {formatCurrency(realIncome)} de {formatCurrency(metaIncome)}
         </div>
       </div>
 
@@ -53,12 +52,12 @@ function BarChart({
         </div>
         <div className="w-full bg-gray-200 rounded-full h-3">
           <div
-            className="bg-red-500 h-3 rounded-full transition-all"
-            style={{ width: `${Math.min(expensePercent, 100)}%` }}
+            className="h-3 rounded-full transition-all"
+            style={{ width: `${Math.min(expensePercent, 100)}%`, backgroundColor: '#f97316' }}
           />
         </div>
         <div className="text-xs text-gray-500 mt-1">
-          ${realExpense.toFixed(2)} de ${metaExpense.toFixed(2)}
+          {formatCurrency(realExpense)} de {formatCurrency(metaExpense)}
         </div>
       </div>
     </div>
@@ -69,7 +68,7 @@ function BarChart({
  * PieChart Component - Inlined
  */
 function PieChart({ categoryTotals }: { categoryTotals: Record<string, number> }) {
-  const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+  const COLORS = ['#3b82f6', '#f97316', '#10b981', '#8b5cf6', '#f59e0b', '#ec4899', '#14b8a6', '#ef4444'];
   const categories = Object.entries(categoryTotals).filter(([_, amount]) => amount > 0);
   
   if (categories.length === 0) {
@@ -117,7 +116,7 @@ function PieChart({ categoryTotals }: { categoryTotals: Record<string, number> }
       <div className="border-t pt-3 mt-3">
         <div className="flex justify-between">
           <span className="text-sm font-semibold text-gray-800">Total Gastos</span>
-          <span className="text-sm font-bold text-gray-900">${total.toFixed(2)}</span>
+          <span className="text-sm font-bold text-gray-900">{formatCurrency(total)}</span>
         </div>
       </div>
     </div>
