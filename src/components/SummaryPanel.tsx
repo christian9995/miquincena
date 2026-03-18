@@ -1,4 +1,4 @@
-// v1.0.0 - Production Ready SummaryPanel
+// v1.0.1 - Force rebuild to detect chart components
 'use client';
 
 import { formatCurrency } from '@/lib/format-utils';
