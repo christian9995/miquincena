@@ -50,6 +50,7 @@ export default function TransactionForm({ onSubmit, editingTransaction, onCancel
             date,
             type,
             category: type === 'egreso' ? category : 'INGRESO',
+            updatedAt: new Date().toISOString(),
         });
         if (!editingTransaction) reset();
     };
