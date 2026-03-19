@@ -156,7 +156,6 @@ export function useFinance() {
         };
 
         initializeApp();
-        });
     }, [isAuthenticated, accessToken, isOnline, updateSyncStatus]);
 
     // Always save to localStorage immediately (Offline-First)
