@@ -44,10 +44,13 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const inactivityTimerRef = React.useRef<NodeJS.Timeout | null>(null);
   const warningTimerRef = React.useRef<NodeJS.Timeout | null>(null);
   const countdownIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
+  const syncTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const syncStartTimeRef = React.useRef<number | null>(null);
 
   // Timeout constants (in milliseconds)
   const INACTIVITY_TIMEOUT = 25 * 60 * 1000; // 25 minutes
   const WARNING_TIME = 24 * 60 * 1000; // 24 minutes (1 minute before timeout)
+  const SYNC_TIMEOUT = 10 * 1000; // 10 seconds max for sync operations
 
   // Verify actual API reachability (not just navigator.onLine)
   const verifyAPIReachability = useCallback(async (): Promise<boolean> => {
@@ -134,26 +137,67 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
     };
 
+    // Force refresh sync status - reset stuck syncs
+    const forceRefreshSyncStatus = () => {
+      // If sync has been running for more than 10 seconds, reset it
+      if (syncStartTimeRef.current && Date.now() - syncStartTimeRef.current > SYNC_TIMEOUT) {
+        setSyncStatus('synced');
+        setIsSyncing(false);
+        syncStartTimeRef.current = null;
+        if (syncTimeoutRef.current) {
+          clearTimeout(syncTimeoutRef.current);
+          syncTimeoutRef.current = null;
+        }
+      }
+      
+      // If stuck on 'pending' for too long, reset to synced
+      if (syncStatus === 'pending' && !isSyncing) {
+        setSyncStatus('synced');
+      }
+    };
+
     // Visibility change trigger - wake up connection when user returns to tab
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        console.log('[v0] App hidden');
+        // Clear sync timeout when tab is hidden
+        if (syncTimeoutRef.current) {
+          clearTimeout(syncTimeoutRef.current);
+          syncTimeoutRef.current = null;
+        }
       } else {
-        console.log('[v0] App visible - triggering connection check');
+        // Immediate focus refresh when returning to tab
+        forceRefreshSyncStatus();
+        
         if (isAuthenticated && isOnline) {
-          console.log('[v0] App restored, checking sync status');
-          setSyncStatus('pending');
-          setHasPendingSync(true);
+          // Verify connection is still alive before triggering sync
+          verifyAPIReachability().then((isReachable) => {
+            if (isReachable) {
+              setSyncStatus('synced');
+              setHasPendingSync(false);
+            } else {
+              setSyncStatus('offline');
+              attemptReconnection();
+            }
+          });
         } else if (isAuthenticated && !isOnline) {
-          // Attempt reconnection when returning to visible
           attemptReconnection();
         }
       }
     };
 
-    // Periodic connection check (heartbeat) with API verification every 30 seconds
+    // Window focus event for immediate refresh
+    const handleWindowFocus = () => {
+      if (isAuthenticated) {
+        forceRefreshSyncStatus();
+      }
+    };
+
+    // Periodic connection check (heartbeat) with API verification and sync status reset every 30 seconds
     const connectionCheckInterval = setInterval(async () => {
       const isOnlineNow = navigator.onLine;
+      
+      // Always check for stuck syncs during heartbeat
+      forceRefreshSyncStatus();
       
       if (isOnlineNow && !isOnline) {
         // Verify actual API reachability before claiming online
@@ -163,6 +207,12 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         }
       } else if (!isOnlineNow && isOnline) {
         handleOffline();
+      } else if (isOnlineNow && isOnline && isAuthenticated) {
+        // Keep-alive: verify connection is still active even when online
+        const isReachable = await verifyAPIReachability();
+        if (!isReachable) {
+          handleOffline();
+        }
       }
     }, 30000);
 
@@ -171,17 +221,20 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    window.addEventListener('focus', handleWindowFocus);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       clearInterval(connectionCheckInterval);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('focus', handleWindowFocus);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (connectionRetryTimerRef.current) clearTimeout(connectionRetryTimerRef.current);
       if (tokenRefreshTimerRef.current) clearTimeout(tokenRefreshTimerRef.current);
+      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
     };
-  }, [isAuthenticated, isOnline, attemptReconnection, verifyAPIReachability, refreshTokenIfNeeded]);
+  }, [isAuthenticated, isOnline, isSyncing, syncStatus, attemptReconnection, verifyAPIReachability, refreshTokenIfNeeded]);
 
   // Check if user is already authenticated on mount
   useEffect(() => {
@@ -349,6 +402,27 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const updateSyncStatus = useCallback((syncing: boolean, status?: 'synced' | 'pending' | 'error' | 'offline') => {
     setIsSyncing(syncing);
+    
+    if (syncing) {
+      // Track when sync started for timeout detection
+      syncStartTimeRef.current = Date.now();
+      
+      // Set a 10-second timeout to auto-reset stuck syncs
+      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+      syncTimeoutRef.current = setTimeout(() => {
+        // Force reset if still syncing after 10 seconds
+        setIsSyncing(false);
+        setSyncStatus('synced');
+        syncStartTimeRef.current = null;
+      }, 10000);
+    } else {
+      // Clear timeout when sync completes
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+        syncTimeoutRef.current = null;
+      }
+      syncStartTimeRef.current = null;
+    }
     
     if (!syncing) {
       const newStatus = status || (isOnline ? 'synced' : 'pending');
