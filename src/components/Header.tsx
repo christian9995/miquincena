@@ -15,6 +15,7 @@ export default function Header({ onConfigClick }: HeaderProps) {
   const [showSuccessNotification, setShowSuccessNotification] = useState(false);
   const [showSyncIndicator, setShowSyncIndicator] = useState(false);
   const [syncIndicatorFading, setSyncIndicatorFading] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { isAuthenticated, user, isSyncing, syncStatus, isOnline, signOut } = useGoogleAuth();
 
@@ -207,7 +208,7 @@ export default function Header({ onConfigClick }: HeaderProps) {
                   {/* Logout Button */}
                   <button
                     onClick={() => {
-                      signOut();
+                      setShowLogoutConfirm(true);
                       handleMenuClose();
                     }}
                     className="w-full flex items-center gap-2 px-4 py-2 hover:bg-red-50 rounded-lg font-medium text-red-600 transition-colors"
@@ -346,6 +347,45 @@ export default function Header({ onConfigClick }: HeaderProps) {
               >
                 Cerrar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="bg-red-600 p-5 text-white text-center">
+              <LogOut size={32} className="mx-auto mb-2" />
+              <h2 className="text-xl font-bold">Cerrar Sesion</h2>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <AlertCircle size={24} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                <p className="text-amber-800 text-sm leading-relaxed">
+                  <strong>Estas seguro?</strong> Se eliminaran los datos locales de este dispositivo por seguridad. Tus datos en la nube permaneceran seguros y podras recuperarlos al iniciar sesion nuevamente.
+                </p>
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowLogoutConfirm(false)}
+                  className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => {
+                    signOut();
+                    setShowLogoutConfirm(false);
+                  }}
+                  className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors"
+                >
+                  Si, Cerrar Sesion
+                </button>
+              </div>
             </div>
           </div>
         </div>

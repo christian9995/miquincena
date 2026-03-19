@@ -303,16 +303,40 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setError(null);
     
     try {
-      // Clear auth tokens and user data
+      // 1. Revoke Google access token if available
+      if (accessToken) {
+        try {
+          await fetch(`https://oauth2.googleapis.com/revoke?token=${accessToken}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          });
+        } catch (revokeErr) {
+          // Token revocation failed, but continue with local cleanup
+        }
+      }
+
+      // 2. Clear ALL auth tokens and user data
       localStorage.removeItem('google_access_token');
       localStorage.removeItem('google_user');
       localStorage.removeItem('google_refresh_token');
       localStorage.removeItem('google_last_sync');
+      localStorage.removeItem('google_pending_sync');
+      localStorage.removeItem('google_token_refresh_needed');
       
+      // 3. SECURE: Clear ALL finance data from localStorage
+      localStorage.removeItem('finanzas_v2026');
+      localStorage.removeItem('presupuestos_v2026');
+      localStorage.removeItem('fecha_semilla_2026');
+      localStorage.removeItem('google_sync_queue_v2026');
+      
+      // 4. Reset all auth state
       setIsAuthenticated(false);
       setUser(null);
       setAccessToken(null);
       setLastSyncTime(null);
+      setSyncStatus('offline');
+      setHasPendingSync(false);
+      
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Sign out failed';
       setError(errorMessage);
@@ -320,7 +344,7 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [accessToken]);
 
   const updateSyncStatus = useCallback((syncing: boolean, status?: 'synced' | 'pending' | 'error' | 'offline') => {
     setIsSyncing(syncing);
