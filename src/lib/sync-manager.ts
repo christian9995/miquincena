@@ -64,53 +64,52 @@ export function deepMergeAppState(
 
 /**
  * Merge transactions by ID with timestamp-based conflict resolution
+ * Uses Map for strict deduplication - each ID appears only ONCE
  * Local transactions without a remote match are kept (pending upload)
  */
 function mergeTransactionsByID(
   localTxs: AppState['transactions'],
   remoteTxs: AppState['transactions']
 ): AppState['transactions'] {
-  const result: AppState['transactions'] = [];
-  const processedIds = new Set<string>();
+  // Use Map for strict deduplication by ID
+  const txMap = new Map<string, AppState['transactions'][0]>();
 
-  // Process all local transactions
+  // First pass: add all remote transactions to the map
+  for (const remoteTx of remoteTxs) {
+    // Skip transactions without valid IDs (legacy data)
+    if (!remoteTx.id || !remoteTx.id.startsWith('tx_')) {
+      continue;
+    }
+    txMap.set(remoteTx.id, remoteTx);
+  }
+
+  // Second pass: process local transactions (local wins on conflict if newer)
   for (const localTx of localTxs) {
-    const txId = localTx.id || `local_${localTxs.indexOf(localTx)}`;
-    processedIds.add(txId);
+    // Skip transactions without valid IDs (legacy data)
+    if (!localTx.id || !localTx.id.startsWith('tx_')) {
+      continue;
+    }
+
+    const existingTx = txMap.get(localTx.id);
     
-    // Find matching remote transaction
-    const remoteTx = remoteTxs.find(tx => (tx.id || `remote_${remoteTxs.indexOf(tx)}`) === txId);
-    
-    if (!remoteTx) {
-      // Local transaction not in remote: KEEP IT (pending upload)
-      console.log('[v0] Keeping local transaction (no remote match):', txId);
-      result.push({ ...localTx, id: txId });
+    if (!existingTx) {
+      // Local transaction not in remote: add it (pending upload)
+      txMap.set(localTx.id, localTx);
     } else {
       // Both exist: use most recent based on updatedAt
       const localTimestamp = new Date(localTx.updatedAt || 0).getTime();
-      const remoteTimestamp = new Date(remoteTx.updatedAt || 0).getTime();
+      const remoteTimestamp = new Date(existingTx.updatedAt || 0).getTime();
       
       if (localTimestamp >= remoteTimestamp) {
-        console.log('[v0] Using local version of transaction:', txId);
-        result.push(localTx);
-      } else {
-        console.log('[v0] Using remote version of transaction:', txId);
-        result.push(remoteTx);
+        // Local is newer or equal - keep local
+        txMap.set(localTx.id, localTx);
       }
+      // If remote is newer, it's already in the map
     }
   }
 
-  // Process remote transactions not in local (new remote items)
-  for (const remoteTx of remoteTxs) {
-    const txId = remoteTx.id || `remote_${remoteTxs.indexOf(remoteTx)}`;
-    
-    if (!processedIds.has(txId)) {
-      console.log('[v0] Adding new remote transaction:', txId);
-      result.push(remoteTx);
-    }
-  }
-
-  console.log('[v0] Merged transactions: local=', localTxs.length, 'remote=', remoteTxs.length, 'result=', result.length);
+  const result = Array.from(txMap.values());
+  console.log('[v0] Deduped transactions: local=', localTxs.length, 'remote=', remoteTxs.length, 'result=', result.length);
   return result;
 }
 

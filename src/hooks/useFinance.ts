@@ -23,56 +23,75 @@ export function useFinance() {
     const { isAuthenticated, accessToken, updateSyncStatus, triggerPendingSync, isOnline } = useGoogleAuth();
     const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+    // Deduplicate transactions by ID (cleanup for any previous bugs)
+    const deduplicateTransactions = (txs: Transaction[]): Transaction[] => {
+        const txMap = new Map<string, Transaction>();
+        for (const tx of txs) {
+            // Only keep transactions with valid IDs
+            if (tx.id && tx.id.startsWith('tx_')) {
+                const existing = txMap.get(tx.id);
+                if (!existing) {
+                    txMap.set(tx.id, tx);
+                } else {
+                    // Keep the one with the most recent updatedAt
+                    const existingTime = new Date(existing.updatedAt || 0).getTime();
+                    const currentTime = new Date(tx.updatedAt || 0).getTime();
+                    if (currentTime > existingTime) {
+                        txMap.set(tx.id, tx);
+                    }
+                }
+            }
+        }
+        return Array.from(txMap.values());
+    };
+
     // Load data from localStorage on mount (Offline-First)
     useEffect(() => {
         const initializeApp = async () => {
             try {
                 // Always load from localStorage first (Offline-First)
-                loadFromLocalStorage();
+                const localData = loadFromLocalStorage();
                 
                 // Then attempt Google Drive sync if authenticated and online
-                if (isAuthenticated && accessToken && isOnline) {
+                if (isAuthenticated && accessToken && isOnline && localData) {
                     console.log('[v0] Attempting to sync with Google Drive');
                     try {
-                        // UPLOAD-FIRST: Always upload local changes before attempting download
-                        console.log('[v0] Uploading local changes to Drive first');
-                        await saveAppStateToDrive(accessToken, {
-                            transactions,
-                            budgets,
-                            seedDate,
-                            timestamp: Date.now(),
-                        });
-                        console.log('[v0] Successfully uploaded local changes to Drive');
-                        
-                        // THEN download remote data to check for newer changes from other devices
-                        console.log('[v0] Downloading remote data to check for newer changes');
+                        // Download remote data first to check what exists
+                        console.log('[v0] Downloading remote data to check for changes');
                         const driveData = await loadAppStateFromDrive(accessToken);
+                        
                         if (driveData) {
-                            const localState = {
-                                transactions: JSON.parse(localStorage.getItem(STORAGE_KEY_TRANSACTIONS) || '[]'),
-                                budgets: JSON.parse(localStorage.getItem(STORAGE_KEY_BUDGETS) || '{}'),
-                                seedDate: localStorage.getItem(STORAGE_KEY_SEED_DATE) || '2026-01-02',
-                                timestamp: Date.now(),
-                            };
-                            
                             // Deep merge with transaction-level identity tracking
-                            const merged = deepMergeAppState(localState, driveData);
-                            setTransactions(merged.transactions);
+                            const merged = deepMergeAppState(localData, driveData);
+                            
+                            // Deduplicate before setting state
+                            const dedupedTransactions = deduplicateTransactions(merged.transactions);
+                            
+                            setTransactions(dedupedTransactions);
                             setBudgets(merged.budgets);
                             setSeedDate(merged.seedDate);
+                            
+                            // Save deduped data back to localStorage
+                            localStorage.setItem(STORAGE_KEY_TRANSACTIONS, JSON.stringify(dedupedTransactions));
+                            localStorage.setItem(STORAGE_KEY_BUDGETS, JSON.stringify(merged.budgets));
+                            
                             updateSyncStatus(false, 'synced');
-                            console.log('[v0] Deep merge complete: local transactions kept if no remote match');
+                            console.log('[v0] Deep merge complete with deduplication');
                             
                             // After merging, set current period based on today's date
                             const todayPeriodIndex = getCurrentPeriodIndex(new Date(), merged.seedDate);
                             setCurrentPeriodIndex(todayPeriodIndex);
                         } else {
-                            console.log('[v0] No data in Google Drive, local changes remain');
+                            // No remote data - upload local data
+                            console.log('[v0] No data in Google Drive, uploading local data');
+                            await saveAppStateToDrive(accessToken, {
+                                ...localData,
+                                timestamp: Date.now(),
+                            });
                             updateSyncStatus(false, 'synced');
                         }
                     } catch (driveErr) {
                         console.log('[v0] Google Drive sync not available - using localStorage only');
-                        console.log('[v0] Note: Google Drive sync requires proper OAuth 2.0 Authorization Code Flow with drive.appdata scope');
                         console.log('[v0] Error:', driveErr);
                         updateSyncStatus(false, 'offline');
                     }
@@ -88,9 +107,22 @@ export function useFinance() {
             const savedBudgets = localStorage.getItem(STORAGE_KEY_BUDGETS);
             const savedSeedDate = localStorage.getItem(STORAGE_KEY_SEED_DATE);
 
+            let parsedTransactions: Transaction[] = [];
+            let parsedBudgets: Budgets = {};
+            let parsedSeedDate = '2026-01-02';
+
             if (savedTransactions) {
                 try {
-                    setTransactions(JSON.parse(savedTransactions));
+                    const raw = JSON.parse(savedTransactions);
+                    // Deduplicate on load to clean up any previous bugs
+                    parsedTransactions = deduplicateTransactions(raw);
+                    setTransactions(parsedTransactions);
+                    
+                    // Save cleaned data back if there were duplicates
+                    if (parsedTransactions.length !== raw.length) {
+                        console.log('[v0] Cleaned', raw.length - parsedTransactions.length, 'duplicate transactions');
+                        localStorage.setItem(STORAGE_KEY_TRANSACTIONS, JSON.stringify(parsedTransactions));
+                    }
                 } catch (e) {
                     console.error("Error parsing transactions", e);
                 }
@@ -98,26 +130,32 @@ export function useFinance() {
 
             if (savedBudgets) {
                 try {
-                    setBudgets(JSON.parse(savedBudgets));
+                    parsedBudgets = JSON.parse(savedBudgets);
+                    setBudgets(parsedBudgets);
                 } catch (e) {
                     console.error("Error parsing budgets", e);
                 }
             }
 
             if (savedSeedDate) {
-                setSeedDate(savedSeedDate);
-                // After setting seed date, calculate current period based on today's date
-                const todayPeriodIndex = getCurrentPeriodIndex(new Date(), savedSeedDate);
-                setCurrentPeriodIndex(todayPeriodIndex);
-            } else {
-                // If no seed date saved, calculate for default seed date
-                const todayPeriodIndex = getCurrentPeriodIndex(new Date(), '2026-01-02');
-                setCurrentPeriodIndex(todayPeriodIndex);
+                parsedSeedDate = savedSeedDate;
+                setSeedDate(parsedSeedDate);
             }
+
+            // Set current period based on today's date
+            const todayPeriodIndex = getCurrentPeriodIndex(new Date(), parsedSeedDate);
+            setCurrentPeriodIndex(todayPeriodIndex);
+            setIsInitialized(true);
+
+            return {
+                transactions: parsedTransactions,
+                budgets: parsedBudgets,
+                seedDate: parsedSeedDate,
+                timestamp: Date.now(),
+            };
         };
 
-        initializeApp().finally(() => {
-            setIsInitialized(true);
+        initializeApp();
         });
     }, [isAuthenticated, accessToken, isOnline, updateSyncStatus]);
 
