@@ -13,14 +13,11 @@ interface GoogleAuthContextType {
   lastSyncTime: number | null;
   isOnline: boolean;
   hasPendingSync: boolean;
-  showTimeoutWarning: boolean;
-  timeoutSecondsRemaining: number;
   signIn: (response: GoogleAuthResponse) => Promise<void>;
   signOut: () => Promise<void>;
   error: string | null;
   updateSyncStatus: (isSyncing: boolean, status?: 'synced' | 'pending' | 'error' | 'offline') => void;
   triggerPendingSync: () => Promise<void>;
-  resetActivityTimer: () => void;
 }
 
 const GoogleAuthContext = createContext<GoogleAuthContextType | undefined>(undefined);
@@ -36,20 +33,13 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [hasPendingSync, setHasPendingSync] = useState(false);
-  const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
-  const [timeoutSecondsRemaining, setTimeoutSecondsRemaining] = useState(60);
   const connectionRetryTimerRef = React.useRef<NodeJS.Timeout | null>(null);
   const retryCountRef = React.useRef(0);
   const tokenRefreshTimerRef = React.useRef<NodeJS.Timeout | null>(null);
-  const inactivityTimerRef = React.useRef<NodeJS.Timeout | null>(null);
-  const warningTimerRef = React.useRef<NodeJS.Timeout | null>(null);
-  const countdownIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
   const syncTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   const syncStartTimeRef = React.useRef<number | null>(null);
 
   // Timeout constants (in milliseconds)
-  const INACTIVITY_TIMEOUT = 25 * 60 * 1000; // 25 minutes
-  const WARNING_TIME = 24 * 60 * 1000; // 24 minutes (1 minute before timeout)
   const SYNC_TIMEOUT = 10 * 1000; // 10 seconds max for sync operations
 
   // Verify actual API reachability (not just navigator.onLine)
@@ -447,90 +437,6 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setHasPendingSync(false);
   }, []);
 
-  // Reset activity timer - called on any user interaction
-  const resetActivityTimer = useCallback(() => {
-    // Clear existing timers
-    if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
-    if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
-    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
-
-    // Hide warning if showing
-    if (showTimeoutWarning) {
-      setShowTimeoutWarning(false);
-      setTimeoutSecondsRemaining(60);
-    }
-
-    // Only set timers if authenticated
-    if (!isAuthenticated) return;
-
-    // Set warning timer (24 minutes)
-    warningTimerRef.current = setTimeout(() => {
-      setShowTimeoutWarning(true);
-      setTimeoutSecondsRemaining(60);
-
-      // Start countdown
-      countdownIntervalRef.current = setInterval(() => {
-        setTimeoutSecondsRemaining((prev) => {
-          if (prev <= 1) {
-            if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }, WARNING_TIME);
-
-    // Set logout timer (25 minutes)
-    inactivityTimerRef.current = setTimeout(() => {
-      signOut();
-      setShowTimeoutWarning(false);
-    }, INACTIVITY_TIMEOUT);
-  }, [isAuthenticated, showTimeoutWarning, signOut]);
-
-  // Set up activity listeners when authenticated
-  useEffect(() => {
-    if (!isAuthenticated) {
-      // Clear all timers when logged out
-      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
-      if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
-      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
-      setShowTimeoutWarning(false);
-      return;
-    }
-
-    // Activity events to track
-    const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
-
-    // Throttle the reset to avoid excessive calls
-    let lastActivity = Date.now();
-    const throttledReset = () => {
-      const now = Date.now();
-      if (now - lastActivity > 1000) { // Only reset if more than 1 second since last activity
-        lastActivity = now;
-        resetActivityTimer();
-      }
-    };
-
-    // Add listeners
-    activityEvents.forEach((event) => {
-      document.addEventListener(event, throttledReset, { passive: true });
-    });
-
-    // Initialize timer
-    resetActivityTimer();
-
-    return () => {
-      // Cleanup listeners
-      activityEvents.forEach((event) => {
-        document.removeEventListener(event, throttledReset);
-      });
-      // Cleanup timers
-      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
-      if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
-      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
-    };
-  }, [isAuthenticated, resetActivityTimer]);
-
   return (
     <GoogleAuthContext.Provider
       value={{
@@ -546,36 +452,11 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         lastSyncTime,
         isOnline,
         hasPendingSync,
-        showTimeoutWarning,
-        timeoutSecondsRemaining,
         updateSyncStatus,
         triggerPendingSync,
-        resetActivityTimer,
       }}
     >
       {children}
-
-      {/* Inactivity Warning Banner */}
-      {showTimeoutWarning && (
-        <div 
-          className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 bg-amber-500 text-white px-4 py-3 rounded-lg shadow-lg z-50 animate-pulse cursor-pointer"
-          onClick={resetActivityTimer}
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex-shrink-0">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div className="flex-1">
-              <p className="font-medium text-sm">
-                Tu sesion expirara en {timeoutSecondsRemaining} segundo{timeoutSecondsRemaining !== 1 ? 's' : ''} por seguridad.
-              </p>
-              <p className="text-xs opacity-90">Toca cualquier lugar para continuar.</p>
-            </div>
-          </div>
-        </div>
-      )}
     </GoogleAuthContext.Provider>
   );
 };
