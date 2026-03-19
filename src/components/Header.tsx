@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Menu, X, LogOut, Cloud, AlertCircle, Wifi, CheckCircle } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Menu, X, LogOut, Cloud, AlertCircle, Wifi, CheckCircle, Loader2 } from 'lucide-react';
 import { useGoogleAuth } from '@/context/GoogleAuthContext';
 import GoogleSignIn from './GoogleSignIn';
 
@@ -13,7 +13,53 @@ export default function Header({ onConfigClick }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<'about' | 'guide' | null>(null);
   const [showSuccessNotification, setShowSuccessNotification] = useState(false);
+  const [showSyncIndicator, setShowSyncIndicator] = useState(false);
+  const [syncIndicatorFading, setSyncIndicatorFading] = useState(false);
+  const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { isAuthenticated, user, isSyncing, syncStatus, isOnline, signOut } = useGoogleAuth();
+
+  // Manage sync indicator visibility with auto-hide for 'synced' state
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setShowSyncIndicator(false);
+      return;
+    }
+
+    // Clear any existing hide timer
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+
+    // Show indicator for syncing, error, or briefly for synced
+    if (isSyncing || syncStatus === 'pending') {
+      setShowSyncIndicator(true);
+      setSyncIndicatorFading(false);
+    } else if (syncStatus === 'synced') {
+      setShowSyncIndicator(true);
+      setSyncIndicatorFading(false);
+      // Auto-hide after 3 seconds with fade effect
+      hideTimerRef.current = setTimeout(() => {
+        setSyncIndicatorFading(true);
+        // After fade animation, hide completely
+        setTimeout(() => {
+          setShowSyncIndicator(false);
+          setSyncIndicatorFading(false);
+        }, 300);
+      }, 3000);
+    } else if (syncStatus === 'error') {
+      setShowSyncIndicator(true);
+      setSyncIndicatorFading(false);
+    } else if (syncStatus === 'offline') {
+      setShowSyncIndicator(false);
+    }
+
+    return () => {
+      if (hideTimerRef.current) {
+        clearTimeout(hideTimerRef.current);
+      }
+    };
+  }, [isAuthenticated, isSyncing, syncStatus]);
 
   // Show success notification when first synced
   useEffect(() => {
@@ -48,6 +94,47 @@ export default function Header({ onConfigClick }: HeaderProps) {
               className="w-10 h-10 md:w-12 md:h-12 object-contain"
             />
             <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Mi Quincena</h1>
+            
+            {/* Compact Sync Status Indicator */}
+            {isAuthenticated && showSyncIndicator && (
+              <div 
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition-opacity duration-300 ${
+                  syncIndicatorFading ? 'opacity-0' : 'opacity-100'
+                } ${
+                  isSyncing || syncStatus === 'pending'
+                    ? 'bg-yellow-100 text-yellow-700'
+                    : syncStatus === 'synced'
+                    ? 'bg-green-100 text-green-700'
+                    : syncStatus === 'error'
+                    ? 'bg-red-100 text-red-700'
+                    : 'bg-gray-100 text-gray-600'
+                }`}
+              >
+                {(isSyncing || syncStatus === 'pending') && (
+                  <>
+                    <Loader2 size={12} className="animate-spin" />
+                    <span className="hidden sm:inline">Sincronizando...</span>
+                  </>
+                )}
+                {syncStatus === 'synced' && !isSyncing && (
+                  <>
+                    <CheckCircle size={12} />
+                    <span className="hidden sm:inline">Sincronizado</span>
+                  </>
+                )}
+                {syncStatus === 'error' && !isSyncing && (
+                  <>
+                    <AlertCircle size={12} />
+                    <span className="hidden sm:inline">Error de Conexión</span>
+                  </>
+                )}
+              </div>
+            )}
+            
+            {/* Minimal green dot when synced and indicator is hidden */}
+            {isAuthenticated && !showSyncIndicator && syncStatus === 'synced' && (
+              <div className="w-2 h-2 bg-green-500 rounded-full" title="Sincronizado" />
+            )}
           </div>
           
           <div className="flex items-center gap-3">
