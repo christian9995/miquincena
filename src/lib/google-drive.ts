@@ -5,9 +5,17 @@
 
 const FILE_NAME = 'miquincena-data.json';
 
+export interface Balances {
+  cheques: number;
+  ahorros: number;
+  efectivo: number;
+  updatedAt: string;
+}
+
 export interface AppState {
   transactions: any[];
   budgets: Record<string, any>;
+  balances: Balances;
   seedDate: string;
   timestamp: number;
 }

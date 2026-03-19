@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Transaction, Budgets, TransactionType } from '@/types';
+import { Transaction, Budgets, Balances, TransactionType } from '@/types';
 import { getCurrentPeriodIndex, getPeriodDates } from '@/lib/finance-utils';
 import { useGoogleAuth } from '@/context/GoogleAuthContext';
 import { saveAppStateToDrive, loadAppStateFromDrive, getCloudTimestamp } from '@/lib/google-drive';
@@ -9,15 +9,24 @@ import { resolveSyncConflict, deepMergeAppState, mirrorSyncFromCloud } from '@/l
 
 const STORAGE_KEY_TRANSACTIONS = 'finanzas_v2026';
 const STORAGE_KEY_BUDGETS = 'presupuestos_v2026';
+const STORAGE_KEY_BALANCES = 'balances_v2026';
 const STORAGE_KEY_SEED_DATE = 'fecha_semilla_2026';
 const STORAGE_KEY_SYNC_QUEUE = 'google_sync_queue_v2026';
 const STORAGE_KEY_LOCAL_TIMESTAMP = 'local_data_timestamp_v2026';
 const SYNC_DEBOUNCE_MS = 3000;
 const AUTO_PULL_INTERVAL_MS = 30000; // 30 seconds for cross-device sync
 
+const DEFAULT_BALANCES: Balances = {
+    cheques: 0,
+    ahorros: 0,
+    efectivo: 0,
+    updatedAt: new Date().toISOString(),
+};
+
 export function useFinance() {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [budgets, setBudgets] = useState<Budgets>({});
+    const [balances, setBalances] = useState<Balances>(DEFAULT_BALANCES);
     const [currentPeriodIndex, setCurrentPeriodIndex] = useState(0);
     const [isInitialized, setIsInitialized] = useState(false);
     const [seedDate, setSeedDate] = useState('2026-01-02');
@@ -109,10 +118,12 @@ export function useFinance() {
         const loadFromLocalStorage = () => {
             const savedTransactions = localStorage.getItem(STORAGE_KEY_TRANSACTIONS);
             const savedBudgets = localStorage.getItem(STORAGE_KEY_BUDGETS);
+            const savedBalances = localStorage.getItem(STORAGE_KEY_BALANCES);
             const savedSeedDate = localStorage.getItem(STORAGE_KEY_SEED_DATE);
 
             let parsedTransactions: Transaction[] = [];
             let parsedBudgets: Budgets = {};
+            let parsedBalances: Balances = DEFAULT_BALANCES;
             let parsedSeedDate = '2026-01-02';
 
             if (savedTransactions) {
@@ -124,7 +135,6 @@ export function useFinance() {
                     
                     // Save cleaned data back if there were duplicates
                     if (parsedTransactions.length !== raw.length) {
-                        console.log('[v0] Cleaned', raw.length - parsedTransactions.length, 'duplicate transactions');
                         localStorage.setItem(STORAGE_KEY_TRANSACTIONS, JSON.stringify(parsedTransactions));
                     }
                 } catch (e) {
@@ -141,6 +151,15 @@ export function useFinance() {
                 }
             }
 
+            if (savedBalances) {
+                try {
+                    parsedBalances = JSON.parse(savedBalances);
+                    setBalances(parsedBalances);
+                } catch (e) {
+                    console.error("Error parsing balances", e);
+                }
+            }
+
             if (savedSeedDate) {
                 parsedSeedDate = savedSeedDate;
                 setSeedDate(parsedSeedDate);
@@ -154,6 +173,7 @@ export function useFinance() {
             return {
                 transactions: parsedTransactions,
                 budgets: parsedBudgets,
+                balances: parsedBalances,
                 seedDate: parsedSeedDate,
                 timestamp: Date.now(),
             };
@@ -171,6 +191,7 @@ export function useFinance() {
         const now = Date.now();
         localStorage.setItem(STORAGE_KEY_TRANSACTIONS, JSON.stringify(transactions));
         localStorage.setItem(STORAGE_KEY_BUDGETS, JSON.stringify(budgets));
+        localStorage.setItem(STORAGE_KEY_BALANCES, JSON.stringify(balances));
         localStorage.setItem(STORAGE_KEY_SEED_DATE, seedDate);
         localStorage.setItem(STORAGE_KEY_LOCAL_TIMESTAMP, now.toString());
         localTimestampRef.current = now;
@@ -196,10 +217,10 @@ export function useFinance() {
                     }
 
                     updateSyncStatus(true);
-                    console.log('[v0] Starting Drive sync with token');
                     await saveAppStateToDrive(accessToken, {
                         transactions,
                         budgets,
+                        balances,
                         seedDate,
                         timestamp: Date.now(),
                     });
@@ -227,7 +248,7 @@ export function useFinance() {
                 clearTimeout(syncTimeoutRef.current);
             }
         };
-    }, [transactions, budgets, seedDate, isInitialized, isAuthenticated, accessToken, isOnline, updateSyncStatus]);
+    }, [transactions, budgets, balances, seedDate, isInitialized, isAuthenticated, accessToken, isOnline, updateSyncStatus]);
 
     // Auto-pull polling: Check for cloud updates every 30 seconds for cross-device sync
     useEffect(() => {
@@ -262,6 +283,7 @@ export function useFinance() {
                         const localState = {
                             transactions: JSON.parse(localStorage.getItem(STORAGE_KEY_TRANSACTIONS) || '[]'),
                             budgets: JSON.parse(localStorage.getItem(STORAGE_KEY_BUDGETS) || '{}'),
+                            balances: JSON.parse(localStorage.getItem(STORAGE_KEY_BALANCES) || JSON.stringify(DEFAULT_BALANCES)),
                             seedDate: localStorage.getItem(STORAGE_KEY_SEED_DATE) || '2026-01-02',
                             timestamp: localTimestamp,
                         };
@@ -274,11 +296,13 @@ export function useFinance() {
                         // Update state to exactly match cloud
                         setTransactions(dedupedTransactions);
                         setBudgets(mirrored.budgets);
+                        if (mirrored.balances) setBalances(mirrored.balances);
                         if (mirrored.seedDate) setSeedDate(mirrored.seedDate);
 
                         // Update local storage and timestamp
                         localStorage.setItem(STORAGE_KEY_TRANSACTIONS, JSON.stringify(dedupedTransactions));
                         localStorage.setItem(STORAGE_KEY_BUDGETS, JSON.stringify(mirrored.budgets));
+                        if (mirrored.balances) localStorage.setItem(STORAGE_KEY_BALANCES, JSON.stringify(mirrored.balances));
                         localStorage.setItem(STORAGE_KEY_LOCAL_TIMESTAMP, cloudTimestamp.toString());
                         localTimestampRef.current = cloudTimestamp;
                     }
@@ -383,16 +407,27 @@ export function useFinance() {
         if (confirm('¿Borrar TODO?')) {
             setTransactions([]);
             setBudgets({});
+            setBalances(DEFAULT_BALANCES);
             setSeedDate('2026-01-02');
             localStorage.removeItem(STORAGE_KEY_TRANSACTIONS);
             localStorage.removeItem(STORAGE_KEY_BUDGETS);
+            localStorage.removeItem(STORAGE_KEY_BALANCES);
             localStorage.removeItem(STORAGE_KEY_SEED_DATE);
         }
+    };
+
+    const updateBalances = (newBalances: Partial<Balances>) => {
+        setBalances((prev) => ({
+            ...prev,
+            ...newBalances,
+            updatedAt: new Date().toISOString(),
+        }));
     };
 
     return {
         transactions,
         budgets,
+        balances,
         currentPeriodIndex,
         setCurrentPeriodIndex,
         currentPeriodData,
@@ -400,6 +435,7 @@ export function useFinance() {
         updateTransaction,
         deleteTransaction,
         saveBudget,
+        updateBalances,
         clearAll,
         isInitialized,
         seedDate,

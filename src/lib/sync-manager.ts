@@ -48,6 +48,7 @@ export function mirrorSyncFromCloud(
     return {
       transactions: remote.transactions || [],
       budgets: remote.budgets || {},
+      balances: remote.balances || local.balances,
       seedDate: remote.seedDate || local.seedDate,
       timestamp: remoteTimestamp,
     };
