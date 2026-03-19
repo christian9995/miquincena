@@ -32,9 +32,36 @@ export async function verifyAPIConnectivity(): Promise<boolean> {
 }
 
 /**
+ * Mirror Sync from Cloud
+ * When cloud timestamp is newer, make local state EXACTLY match cloud
+ * This ensures deletions are reflected across devices
+ */
+export function mirrorSyncFromCloud(
+  local: AppState,
+  remote: AppState
+): AppState {
+  const localTimestamp = local.timestamp || 0;
+  const remoteTimestamp = remote.timestamp || 0;
+
+  // If cloud is newer, use cloud data exactly (mirror sync)
+  if (remoteTimestamp > localTimestamp) {
+    return {
+      transactions: remote.transactions || [],
+      budgets: remote.budgets || {},
+      seedDate: remote.seedDate || local.seedDate,
+      timestamp: remoteTimestamp,
+    };
+  }
+
+  // If local is newer, keep local (will be uploaded)
+  return local;
+}
+
+/**
  * Local-First Deep Merge Strategy
  * Merges local and remote data with transaction-level identity tracking
  * Rule: Most recent updatedAt timestamp wins, local-only transactions never deleted
+ * NOTE: Use mirrorSyncFromCloud for auto-pull to reflect deletions
  */
 export function deepMergeAppState(
   local: AppState,

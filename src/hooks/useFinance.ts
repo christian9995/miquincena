@@ -5,7 +5,7 @@ import { Transaction, Budgets, TransactionType } from '@/types';
 import { getCurrentPeriodIndex, getPeriodDates } from '@/lib/finance-utils';
 import { useGoogleAuth } from '@/context/GoogleAuthContext';
 import { saveAppStateToDrive, loadAppStateFromDrive, getCloudTimestamp } from '@/lib/google-drive';
-import { resolveSyncConflict, deepMergeAppState } from '@/lib/sync-manager';
+import { resolveSyncConflict, deepMergeAppState, mirrorSyncFromCloud } from '@/lib/sync-manager';
 
 const STORAGE_KEY_TRANSACTIONS = 'finanzas_v2026';
 const STORAGE_KEY_BUDGETS = 'presupuestos_v2026';
@@ -250,7 +250,7 @@ export function useFinance() {
                 const localTimestamp = localTimestampRef.current || 
                     parseInt(localStorage.getItem(STORAGE_KEY_LOCAL_TIMESTAMP) || '0');
 
-                // If cloud is newer, pull the data
+                // If cloud is newer, mirror the cloud state exactly (includes deletions)
                 if (cloudTimestamp > localTimestamp) {
                     // Show syncing indicator
                     updateSyncStatus(true);
@@ -266,18 +266,19 @@ export function useFinance() {
                             timestamp: localTimestamp,
                         };
 
-                        // Deep merge to avoid data loss
-                        const merged = deepMergeAppState(localState, driveData);
-                        const dedupedTransactions = deduplicateTransactions(merged.transactions);
+                        // Mirror sync: cloud is newer, so use cloud data exactly
+                        // This ensures deletions are reflected on other devices
+                        const mirrored = mirrorSyncFromCloud(localState, driveData);
+                        const dedupedTransactions = deduplicateTransactions(mirrored.transactions);
 
-                        // Update state silently
+                        // Update state to exactly match cloud
                         setTransactions(dedupedTransactions);
-                        setBudgets(merged.budgets);
-                        if (merged.seedDate) setSeedDate(merged.seedDate);
+                        setBudgets(mirrored.budgets);
+                        if (mirrored.seedDate) setSeedDate(mirrored.seedDate);
 
                         // Update local storage and timestamp
                         localStorage.setItem(STORAGE_KEY_TRANSACTIONS, JSON.stringify(dedupedTransactions));
-                        localStorage.setItem(STORAGE_KEY_BUDGETS, JSON.stringify(merged.budgets));
+                        localStorage.setItem(STORAGE_KEY_BUDGETS, JSON.stringify(mirrored.budgets));
                         localStorage.setItem(STORAGE_KEY_LOCAL_TIMESTAMP, cloudTimestamp.toString());
                         localTimestampRef.current = cloudTimestamp;
                     }
