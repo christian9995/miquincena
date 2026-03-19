@@ -327,21 +327,10 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         }
       }
 
-      // 2. Clear ALL auth tokens and user data
-      localStorage.removeItem('google_access_token');
-      localStorage.removeItem('google_user');
-      localStorage.removeItem('google_refresh_token');
-      localStorage.removeItem('google_last_sync');
-      localStorage.removeItem('google_pending_sync');
-      localStorage.removeItem('google_token_refresh_needed');
+      // 2. NUCLEAR OPTION: Clear ALL localStorage data for maximum security
+      localStorage.clear();
       
-      // 3. SECURE: Clear ALL finance data from localStorage
-      localStorage.removeItem('finanzas_v2026');
-      localStorage.removeItem('presupuestos_v2026');
-      localStorage.removeItem('fecha_semilla_2026');
-      localStorage.removeItem('google_sync_queue_v2026');
-      
-      // 4. Reset all auth state
+      // 3. Reset all auth state to initial values
       setIsAuthenticated(false);
       setUser(null);
       setAccessToken(null);
