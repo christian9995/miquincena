@@ -120,6 +120,50 @@ async function findOrCreateFile(accessToken: string): Promise<string> {
 }
 
 /**
+ * Get only the cloud timestamp (lightweight check for auto-sync polling)
+ * Returns the timestamp from the cloud file without downloading full content
+ */
+export async function getCloudTimestamp(accessToken: string): Promise<number | null> {
+  try {
+    if (!accessToken) return null;
+
+    // Search for existing file and get modifiedTime
+    const searchResponse = await fetch(
+      `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='${FILE_NAME}'&fields=files(id,modifiedTime)`,
+      {
+        headers: { 
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!searchResponse.ok) return null;
+
+    const searchData = await searchResponse.json();
+    if (!searchData.files || searchData.files.length === 0) return null;
+
+    const fileId = searchData.files[0].id;
+
+    // Get file metadata to check internal timestamp without downloading full content
+    // We still need to load the file to get our internal timestamp field
+    const contentResponse = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }
+    );
+
+    if (!contentResponse.ok) return null;
+
+    const appState = await contentResponse.json();
+    return appState.timestamp || null;
+  } catch (err) {
+    return null;
+  }
+}
+
+/**
  * Load app state from Google Drive
  */
 export async function loadAppStateFromDrive(accessToken: string): Promise<AppState | null> {

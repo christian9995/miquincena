@@ -4,14 +4,16 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Transaction, Budgets, TransactionType } from '@/types';
 import { getCurrentPeriodIndex, getPeriodDates } from '@/lib/finance-utils';
 import { useGoogleAuth } from '@/context/GoogleAuthContext';
-import { saveAppStateToDrive, loadAppStateFromDrive } from '@/lib/google-drive';
+import { saveAppStateToDrive, loadAppStateFromDrive, getCloudTimestamp } from '@/lib/google-drive';
 import { resolveSyncConflict, deepMergeAppState } from '@/lib/sync-manager';
 
 const STORAGE_KEY_TRANSACTIONS = 'finanzas_v2026';
 const STORAGE_KEY_BUDGETS = 'presupuestos_v2026';
 const STORAGE_KEY_SEED_DATE = 'fecha_semilla_2026';
 const STORAGE_KEY_SYNC_QUEUE = 'google_sync_queue_v2026';
+const STORAGE_KEY_LOCAL_TIMESTAMP = 'local_data_timestamp_v2026';
 const SYNC_DEBOUNCE_MS = 3000;
+const AUTO_PULL_INTERVAL_MS = 30000; // 30 seconds for cross-device sync
 
 export function useFinance() {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -22,6 +24,8 @@ export function useFinance() {
     
     const { isAuthenticated, accessToken, updateSyncStatus, triggerPendingSync, isOnline } = useGoogleAuth();
     const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const autoPullIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const localTimestampRef = useRef<number>(0);
 
     // Deduplicate transactions by ID (cleanup for any previous bugs)
     const deduplicateTransactions = (txs: Transaction[]): Transaction[] => {
@@ -164,11 +168,12 @@ export function useFinance() {
         if (!isInitialized) return;
 
         // ALWAYS save to localStorage first
+        const now = Date.now();
         localStorage.setItem(STORAGE_KEY_TRANSACTIONS, JSON.stringify(transactions));
         localStorage.setItem(STORAGE_KEY_BUDGETS, JSON.stringify(budgets));
         localStorage.setItem(STORAGE_KEY_SEED_DATE, seedDate);
-        
-        console.log('[v0] Data saved to localStorage');
+        localStorage.setItem(STORAGE_KEY_LOCAL_TIMESTAMP, now.toString());
+        localTimestampRef.current = now;
 
         // If authenticated and online, queue sync to Drive
         if (isAuthenticated && accessToken && isOnline) {
@@ -223,6 +228,83 @@ export function useFinance() {
             }
         };
     }, [transactions, budgets, seedDate, isInitialized, isAuthenticated, accessToken, isOnline, updateSyncStatus]);
+
+    // Auto-pull polling: Check for cloud updates every 30 seconds for cross-device sync
+    useEffect(() => {
+        if (!isInitialized || !isAuthenticated || !accessToken || !isOnline) {
+            // Clear interval if conditions not met
+            if (autoPullIntervalRef.current) {
+                clearInterval(autoPullIntervalRef.current);
+                autoPullIntervalRef.current = null;
+            }
+            return;
+        }
+
+        const checkForCloudUpdates = async () => {
+            try {
+                // Get the cloud timestamp
+                const cloudTimestamp = await getCloudTimestamp(accessToken);
+                if (!cloudTimestamp) return;
+
+                // Get local timestamp
+                const localTimestamp = localTimestampRef.current || 
+                    parseInt(localStorage.getItem(STORAGE_KEY_LOCAL_TIMESTAMP) || '0');
+
+                // If cloud is newer, pull the data
+                if (cloudTimestamp > localTimestamp) {
+                    // Show syncing indicator
+                    updateSyncStatus(true);
+
+                    // Download full data from cloud
+                    const driveData = await loadAppStateFromDrive(accessToken);
+                    if (driveData) {
+                        // Get current local state
+                        const localState = {
+                            transactions: JSON.parse(localStorage.getItem(STORAGE_KEY_TRANSACTIONS) || '[]'),
+                            budgets: JSON.parse(localStorage.getItem(STORAGE_KEY_BUDGETS) || '{}'),
+                            seedDate: localStorage.getItem(STORAGE_KEY_SEED_DATE) || '2026-01-02',
+                            timestamp: localTimestamp,
+                        };
+
+                        // Deep merge to avoid data loss
+                        const merged = deepMergeAppState(localState, driveData);
+                        const dedupedTransactions = deduplicateTransactions(merged.transactions);
+
+                        // Update state silently
+                        setTransactions(dedupedTransactions);
+                        setBudgets(merged.budgets);
+                        if (merged.seedDate) setSeedDate(merged.seedDate);
+
+                        // Update local storage and timestamp
+                        localStorage.setItem(STORAGE_KEY_TRANSACTIONS, JSON.stringify(dedupedTransactions));
+                        localStorage.setItem(STORAGE_KEY_BUDGETS, JSON.stringify(merged.budgets));
+                        localStorage.setItem(STORAGE_KEY_LOCAL_TIMESTAMP, cloudTimestamp.toString());
+                        localTimestampRef.current = cloudTimestamp;
+                    }
+
+                    // Show synced indicator after brief delay
+                    setTimeout(() => {
+                        updateSyncStatus(false, 'synced');
+                    }, 500);
+                }
+            } catch (err) {
+                // Silent fail - don't disrupt user experience
+            }
+        };
+
+        // Initial check
+        checkForCloudUpdates();
+
+        // Set up polling interval
+        autoPullIntervalRef.current = setInterval(checkForCloudUpdates, AUTO_PULL_INTERVAL_MS);
+
+        return () => {
+            if (autoPullIntervalRef.current) {
+                clearInterval(autoPullIntervalRef.current);
+                autoPullIntervalRef.current = null;
+            }
+        };
+    }, [isInitialized, isAuthenticated, accessToken, isOnline, updateSyncStatus]);
 
     const currentPeriodData = useMemo(() => {
         const { start, end } = getPeriodDates(currentPeriodIndex, seedDate);
