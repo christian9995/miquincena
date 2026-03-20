@@ -96,7 +96,8 @@ export default function Home() {
               onClick={() => setIsBalanceModalOpen(true)}
               className="btn-success-action col-span-2 lg:col-span-3 p-3 md:p-4 flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 text-sm md:text-base"
             >
-              <CircleDollarSign size={20} /> Balance Real Anual
+              <span className="w-3 h-3 bg-green-400 rounded-full"></span>
+              ${((balances?.cheques || 0) + (balances?.ahorros || 0) + (balances?.efectivo || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </button>
           </div>
 
