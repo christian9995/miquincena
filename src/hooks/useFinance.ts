@@ -375,13 +375,23 @@ export function useFinance() {
         };
         setTransactions((prev) => [...prev, transactionWithTimestamp]);
 
-        // Auto-add income to balances.cheques
-        if (t.type === 'ingreso' && t.amount > 0) {
-            setBalances((prev) => ({
-                ...prev,
-                cheques: prev.cheques + Number(t.amount),
-                updatedAt: new Date().toISOString(),
-            }));
+        // Auto-update balances.cheques based on transaction type
+        if (t.amount > 0) {
+            if (t.type === 'ingreso') {
+                // Income: Add to cheques
+                setBalances((prev) => ({
+                    ...prev,
+                    cheques: prev.cheques + Number(t.amount),
+                    updatedAt: new Date().toISOString(),
+                }));
+            } else if (t.type === 'egreso') {
+                // Expense: Subtract from cheques
+                setBalances((prev) => ({
+                    ...prev,
+                    cheques: prev.cheques - Number(t.amount),
+                    updatedAt: new Date().toISOString(),
+                }));
+            }
         }
     };
 
