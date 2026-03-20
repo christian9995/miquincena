@@ -409,6 +409,31 @@ export function useFinance() {
     };
 
     const deleteTransaction = (index: number) => {
+        // Get the transaction being deleted to revert its balance impact
+        const transactionToDelete = transactions[index];
+        
+        if (transactionToDelete) {
+            const amountValue = Number(transactionToDelete.amount);
+            
+            if (amountValue > 0) {
+                if (transactionToDelete.type === 'ingreso') {
+                    // Revert income: subtract from cheques
+                    setBalances((prev) => ({
+                        ...prev,
+                        cheques: prev.cheques - amountValue,
+                        updatedAt: new Date().toISOString(),
+                    }));
+                } else if (transactionToDelete.type === 'egreso') {
+                    // Revert expense: add back to cheques
+                    setBalances((prev) => ({
+                        ...prev,
+                        cheques: prev.cheques + amountValue,
+                        updatedAt: new Date().toISOString(),
+                    }));
+                }
+            }
+        }
+        
         setTransactions((prev) => prev.filter((_, i) => i !== index));
     };
 
