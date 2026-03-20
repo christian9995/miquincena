@@ -48,7 +48,6 @@ export function mirrorSyncFromCloud(
     return {
       transactions: remote.transactions || [],
       budgets: remote.budgets || {},
-      balances: remote.balances || local.balances,
       seedDate: remote.seedDate || local.seedDate,
       timestamp: remoteTimestamp,
     };
@@ -76,13 +75,6 @@ export function deepMergeAppState(
   // Merge budgets by period index
   const mergedBudgets = mergeBudgetsByPeriod(local.budgets, remote.budgets);
   
-  // Merge balances - use most recently updated
-  const localBalanceTime = new Date(local.balances?.updatedAt || 0).getTime();
-  const remoteBalanceTime = new Date(remote.balances?.updatedAt || 0).getTime();
-  const mergedBalances = remoteBalanceTime > localBalanceTime 
-    ? remote.balances 
-    : (local.balances || remote.balances);
-  
   // Use most recent app-level timestamp
   const mergedTimestamp = Math.max(local.timestamp || 0, remote.timestamp || 0);
   
@@ -92,7 +84,6 @@ export function deepMergeAppState(
   return {
     transactions: mergedTransactions,
     budgets: mergedBudgets,
-    balances: mergedBalances,
     seedDate: mergedSeedDate,
     timestamp: mergedTimestamp,
   };

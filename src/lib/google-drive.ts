@@ -5,17 +5,9 @@
 
 const FILE_NAME = 'miquincena-data.json';
 
-export interface Balances {
-  cheques: number;
-  ahorros: number;
-  efectivo: number;
-  updatedAt: string;
-}
-
 export interface AppState {
   transactions: any[];
   budgets: Record<string, any>;
-  balances: Balances;
   seedDate: string;
   timestamp: number;
 }
@@ -83,12 +75,6 @@ async function findOrCreateFile(accessToken: string): Promise<string> {
     const initialData: AppState = {
       transactions: [],
       budgets: {},
-      balances: {
-        cheques: 0,
-        ahorros: 0,
-        efectivo: 0,
-        updatedAt: new Date().toISOString(),
-      },
       seedDate: '2026-01-02',
       timestamp: Date.now(),
     };

@@ -20,13 +20,6 @@ export interface Budgets {
     [key: number]: Budget;
 }
 
-export interface Balances {
-    cheques: number;
-    ahorros: number;
-    efectivo: number;
-    updatedAt: string; // ISO timestamp for sync conflict resolution
-}
-
 export const CATEGORIES = [
     "GASOLINA",
     "GASTOS PASIVOS RENTA",
@@ -62,7 +55,6 @@ export interface GoogleUserInfo {
 export interface AppState {
     transactions: Transaction[];
     budgets: Budgets;
-    balances: Balances;
     seedDate: string;
     timestamp: number;
 }

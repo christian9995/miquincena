@@ -9,14 +9,12 @@ import SummaryPanel from '@/components/SummaryPanel';
 import TransactionList from '@/components/TransactionList';
 import BudgetModal from '@/components/BudgetModal';
 import AnnualReportModal from '@/components/AnnualReportModal';
-import BalanceRealModal from '@/components/BalanceRealModal';
-import { Search, Plus, BarChart3, Settings, CircleDollarSign } from 'lucide-react';
+import { Search, Plus, BarChart3, Settings } from 'lucide-react';
 
 export default function Home() {
   const {
     transactions,
     budgets,
-    balances,
     currentPeriodIndex,
     setCurrentPeriodIndex,
     currentPeriodData,
@@ -24,7 +22,6 @@ export default function Home() {
     updateTransaction,
     deleteTransaction,
     saveBudget,
-    updateBalances,
     clearAll,
     isInitialized,
     seedDate,
@@ -36,7 +33,6 @@ export default function Home() {
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
-  const [isBalanceModalOpen, setIsBalanceModalOpen] = useState(false);
 
   if (!isInitialized) {
     return (
@@ -92,13 +88,6 @@ export default function Home() {
             >
               <BarChart3 size={20} /> Resumen Anual
             </button>
-            <button
-              onClick={() => setIsBalanceModalOpen(true)}
-              className="btn-success-action col-span-2 lg:col-span-3 p-3 md:p-4 flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 text-sm md:text-base"
-            >
-              <span className="w-3 h-3 bg-green-400 rounded-full"></span>
-              Balance total: ${((balances?.cheques || 0) + (balances?.ahorros || 0) + (balances?.efectivo || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </button>
           </div>
 
             <TransactionForm
@@ -153,13 +142,6 @@ export default function Home() {
         transactions={transactions}
         budgets={budgets}
         seedDate={seedDate}
-      />
-
-      <BalanceRealModal
-        isOpen={isBalanceModalOpen}
-        onClose={() => setIsBalanceModalOpen(false)}
-        balances={balances}
-        onUpdateBalances={updateBalances}
       />
 
       <div id="config-modal" className={`fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 ${isConfigModalOpen ? '' : 'hidden'}`}>
