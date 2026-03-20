@@ -4,9 +4,17 @@ import { useState } from 'react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { Doughnut } from 'react-chartjs-2';
 import { Balances } from '@/types';
-import { X, Edit2, Check, DollarSign, PiggyBank, Wallet } from 'lucide-react';
+import { X, Edit2, Check, DollarSign, PiggyBank, Wallet, ArrowRightLeft } from 'lucide-react';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
+
+type AccountKey = 'cheques' | 'ahorros' | 'efectivo';
+
+const ACCOUNT_NAMES: Record<AccountKey, string> = {
+    cheques: 'Cuenta de Cheques',
+    ahorros: 'Cuenta de Ahorros',
+    efectivo: 'Efectivo',
+};
 
 interface BalanceRealModalProps {
     isOpen: boolean;
@@ -22,6 +30,13 @@ export default function BalanceRealModal({ isOpen, onClose, balances, onUpdateBa
         ahorros: balances.ahorros,
         efectivo: balances.efectivo,
     });
+
+    // Transfer state
+    const [fromAccount, setFromAccount] = useState<AccountKey>('cheques');
+    const [toAccount, setToAccount] = useState<AccountKey>('ahorros');
+    const [transferAmount, setTransferAmount] = useState<number>(0);
+    const [transferError, setTransferError] = useState<string | null>(null);
+    const [transferSuccess, setTransferSuccess] = useState<string | null>(null);
 
     if (!isOpen) return null;
 
@@ -75,6 +90,50 @@ export default function BalanceRealModal({ isOpen, onClose, balances, onUpdateBa
             efectivo: balances.efectivo,
         });
         setIsEditing(true);
+    };
+
+    const handleTransfer = () => {
+        setTransferError(null);
+        setTransferSuccess(null);
+
+        // Validations
+        if (fromAccount === toAccount) {
+            setTransferError('Las cuentas de origen y destino deben ser diferentes.');
+            return;
+        }
+
+        if (transferAmount <= 0) {
+            setTransferError('El monto debe ser mayor a cero.');
+            return;
+        }
+
+        if (transferAmount > balances[fromAccount]) {
+            setTransferError(`Saldo insuficiente en ${ACCOUNT_NAMES[fromAccount]}.`);
+            return;
+        }
+
+        // Execute transfer - subtract from source, add to destination
+        const newBalances = {
+            cheques: balances.cheques,
+            ahorros: balances.ahorros,
+            efectivo: balances.efectivo,
+        };
+
+        newBalances[fromAccount] -= transferAmount;
+        newBalances[toAccount] += transferAmount;
+
+        onUpdateBalances(newBalances);
+
+        // Show success message
+        setTransferSuccess(
+            `Transferencia de $${transferAmount.toLocaleString()} de ${ACCOUNT_NAMES[fromAccount]} a ${ACCOUNT_NAMES[toAccount]} completada.`
+        );
+
+        // Reset form
+        setTransferAmount(0);
+
+        // Clear success message after 3 seconds
+        setTimeout(() => setTransferSuccess(null), 3000);
     };
 
     return (
@@ -193,6 +252,81 @@ export default function BalanceRealModal({ isOpen, onClose, balances, onUpdateBa
                                     <span className="font-semibold text-amber-600">${balances.efectivo.toLocaleString()}</span>
                                 )}
                             </div>
+                        </div>
+                    </div>
+
+                    {/* Transfer Section */}
+                    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                        <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border-b border-gray-200">
+                            <ArrowRightLeft size={18} className="text-gray-600" />
+                            <h4 className="font-semibold text-gray-700">Transferir entre Cuentas</h4>
+                        </div>
+
+                        <div className="p-4 space-y-4">
+                            {/* From Account */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-600 mb-1">De Cuenta</label>
+                                <select
+                                    value={fromAccount}
+                                    onChange={(e) => setFromAccount(e.target.value as AccountKey)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                >
+                                    <option value="cheques">Cuenta de Cheques (${balances.cheques.toLocaleString()})</option>
+                                    <option value="ahorros">Cuenta de Ahorros (${balances.ahorros.toLocaleString()})</option>
+                                    <option value="efectivo">Efectivo (${balances.efectivo.toLocaleString()})</option>
+                                </select>
+                            </div>
+
+                            {/* To Account */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-600 mb-1">A Cuenta</label>
+                                <select
+                                    value={toAccount}
+                                    onChange={(e) => setToAccount(e.target.value as AccountKey)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                >
+                                    <option value="cheques">Cuenta de Cheques (${balances.cheques.toLocaleString()})</option>
+                                    <option value="ahorros">Cuenta de Ahorros (${balances.ahorros.toLocaleString()})</option>
+                                    <option value="efectivo">Efectivo (${balances.efectivo.toLocaleString()})</option>
+                                </select>
+                            </div>
+
+                            {/* Amount */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-600 mb-1">Monto $</label>
+                                <input
+                                    type="number"
+                                    value={transferAmount || ''}
+                                    onChange={(e) => setTransferAmount(Number(e.target.value))}
+                                    placeholder="0.00"
+                                    min="0"
+                                    step="0.01"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                />
+                            </div>
+
+                            {/* Error Message */}
+                            {transferError && (
+                                <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+                                    {transferError}
+                                </div>
+                            )}
+
+                            {/* Success Message */}
+                            {transferSuccess && (
+                                <div className="px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-green-600 text-sm">
+                                    {transferSuccess}
+                                </div>
+                            )}
+
+                            {/* Transfer Button */}
+                            <button
+                                onClick={handleTransfer}
+                                className="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                            >
+                                <ArrowRightLeft size={18} />
+                                Ejecutar Transferencia
+                            </button>
                         </div>
                     </div>
 
