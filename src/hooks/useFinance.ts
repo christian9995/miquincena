@@ -23,6 +23,30 @@ const DEFAULT_BALANCES: Balances = {
     updatedAt: new Date().toISOString(),
 };
 
+// Helper: Recalculate cheques balance from transactions
+// Formula: Initial Balance (ahorros + efectivo stays unchanged) + All Incomes - All Expenses
+const recalculateChequesFromTransactions = (
+    transactions: Transaction[],
+    currentBalances: Balances
+): Balances => {
+    let chequesFromTransactions = 0;
+
+    transactions.forEach((t) => {
+        const amount = Number(t.amount);
+        if (t.type === 'ingreso') {
+            chequesFromTransactions += amount;
+        } else if (t.type === 'egreso') {
+            chequesFromTransactions -= amount;
+        }
+    });
+
+    return {
+        ...currentBalances,
+        cheques: chequesFromTransactions,
+        updatedAt: new Date().toISOString(),
+    };
+};
+
 export function useFinance() {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [budgets, setBudgets] = useState<Budgets>({});
@@ -293,16 +317,22 @@ export function useFinance() {
                         const mirrored = mirrorSyncFromCloud(localState, driveData);
                         const dedupedTransactions = deduplicateTransactions(mirrored.transactions);
 
-                        // Update state to exactly match cloud
+                        // Recalculate balances from transactions to ensure accuracy
+                        const recalculatedBalances = recalculateChequesFromTransactions(
+                            dedupedTransactions,
+                            mirrored.balances || DEFAULT_BALANCES
+                        );
+
+                        // Update state to exactly match cloud with recalculated balances
                         setTransactions(dedupedTransactions);
                         setBudgets(mirrored.budgets);
-                        if (mirrored.balances) setBalances(mirrored.balances);
+                        setBalances(recalculatedBalances);
                         if (mirrored.seedDate) setSeedDate(mirrored.seedDate);
 
                         // Update local storage and timestamp
                         localStorage.setItem(STORAGE_KEY_TRANSACTIONS, JSON.stringify(dedupedTransactions));
                         localStorage.setItem(STORAGE_KEY_BUDGETS, JSON.stringify(mirrored.budgets));
-                        if (mirrored.balances) localStorage.setItem(STORAGE_KEY_BALANCES, JSON.stringify(mirrored.balances));
+                        localStorage.setItem(STORAGE_KEY_BALANCES, JSON.stringify(recalculatedBalances));
                         localStorage.setItem(STORAGE_KEY_LOCAL_TIMESTAMP, cloudTimestamp.toString());
                         localTimestampRef.current = cloudTimestamp;
                     }
