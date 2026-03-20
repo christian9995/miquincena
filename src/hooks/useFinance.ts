@@ -374,6 +374,15 @@ export function useFinance() {
             updatedAt: new Date().toISOString(),
         };
         setTransactions((prev) => [...prev, transactionWithTimestamp]);
+
+        // Auto-add income to balances.cheques
+        if (t.type === 'ingreso' && t.amount > 0) {
+            setBalances((prev) => ({
+                ...prev,
+                cheques: prev.cheques + Number(t.amount),
+                updatedAt: new Date().toISOString(),
+            }));
+        }
     };
 
     const updateTransaction = (index: number, updated: Transaction) => {
