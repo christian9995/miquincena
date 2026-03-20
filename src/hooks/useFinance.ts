@@ -376,19 +376,20 @@ export function useFinance() {
         setTransactions((prev) => [...prev, transactionWithTimestamp]);
 
         // Auto-update balances.cheques based on transaction type
-        if (t.amount > 0) {
+        const amountValue = Number(t.amount);
+        if (amountValue > 0) {
             if (t.type === 'ingreso') {
                 // Income: Add to cheques
                 setBalances((prev) => ({
                     ...prev,
-                    cheques: prev.cheques + Number(t.amount),
+                    cheques: prev.cheques + amountValue,
                     updatedAt: new Date().toISOString(),
                 }));
             } else if (t.type === 'egreso') {
                 // Expense: Subtract from cheques
                 setBalances((prev) => ({
                     ...prev,
-                    cheques: prev.cheques - Number(t.amount),
+                    cheques: prev.cheques - amountValue,
                     updatedAt: new Date().toISOString(),
                 }));
             }
