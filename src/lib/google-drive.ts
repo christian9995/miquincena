@@ -83,6 +83,12 @@ async function findOrCreateFile(accessToken: string): Promise<string> {
     const initialData: AppState = {
       transactions: [],
       budgets: {},
+      balances: {
+        cheques: 0,
+        ahorros: 0,
+        efectivo: 0,
+        updatedAt: new Date().toISOString(),
+      },
       seedDate: '2026-01-02',
       timestamp: Date.now(),
     };

@@ -125,15 +125,16 @@ export default function BalanceRealModal({ isOpen, onClose, balances, onUpdateBa
         onUpdateBalances(newBalances);
 
         // Show success message
-        setTransferSuccess(
-            `Transferencia de $${transferAmount.toLocaleString()} de ${ACCOUNT_NAMES[fromAccount]} a ${ACCOUNT_NAMES[toAccount]} completada.`
-        );
+        setTransferSuccess('Transferencia Exitosa');
 
         // Reset form
         setTransferAmount(0);
 
-        // Clear success message after 3 seconds
-        setTimeout(() => setTransferSuccess(null), 3000);
+        // Close modal after 1.5 seconds
+        setTimeout(() => {
+            setTransferSuccess(null);
+            onClose();
+        }, 1500);
     };
 
     return (
