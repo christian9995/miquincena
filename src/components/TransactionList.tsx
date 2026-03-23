@@ -2,7 +2,13 @@
 
 import { Transaction } from '@/types';
 import { formatCurrency } from '@/lib/finance-utils';
-import { Pencil, Trash2, Tag } from 'lucide-react';
+import { Pencil, Trash2, Tag, Wallet } from 'lucide-react';
+
+const ACCOUNT_COLORS: Record<string, string> = {
+    'Cheques': 'text-blue-600 bg-blue-50',
+    'Ahorros': 'text-green-600 bg-green-50',
+    'Efectivo': 'text-amber-600 bg-amber-50',
+};
 
 interface TransactionListProps {
     transactions: Transaction[];
@@ -44,9 +50,16 @@ export default function TransactionList({ transactions, onEdit, onDelete, search
                         </div>
 
                         <div className="flex items-center gap-4">
-                            <span className={`text-lg font-black ${t.type === 'ingreso' ? 'text-green-600' : 'text-red-600'}`}>
-                                {t.type === 'ingreso' ? '+' : '-'}{formatCurrency(Number(t.amount))}
-                            </span>
+                            <div className="text-right">
+                                <span className={`text-lg font-black ${t.type === 'ingreso' ? 'text-green-600' : 'text-red-600'}`}>
+                                    {t.type === 'ingreso' ? '+' : '-'}{formatCurrency(Number(t.amount))}
+                                </span>
+                                {t.account && (
+                                    <span className={`ml-2 text-xs px-2 py-0.5 rounded inline-flex items-center gap-1 ${ACCOUNT_COLORS[t.account] || 'text-gray-600 bg-gray-50'}`}>
+                                        <Wallet size={10} /> {t.account}
+                                    </span>
+                                )}
+                            </div>
                             <div className="flex gap-1">
                                 <button
                                     onClick={() => onEdit((t as any).originalIndex)}

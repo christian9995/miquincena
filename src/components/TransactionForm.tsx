@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Transaction, TransactionType, CATEGORIES } from '@/types';
+import { Transaction, TransactionType, AccountType, CATEGORIES, ACCOUNTS } from '@/types';
 
 interface TransactionFormProps {
     onSubmit: (t: Transaction) => void;
@@ -21,6 +21,7 @@ export default function TransactionForm({ onSubmit, editingTransaction, onCancel
     });
     const [type, setType] = useState<TransactionType>('ingreso');
     const [category, setCategory] = useState(CATEGORIES[0]);
+    const [account, setAccount] = useState<AccountType>('Cheques');
 
     useEffect(() => {
         if (editingTransaction) {
@@ -29,6 +30,7 @@ export default function TransactionForm({ onSubmit, editingTransaction, onCancel
             setDate(editingTransaction.date);
             setType(editingTransaction.type);
             setCategory(editingTransaction.category as any);
+            setAccount(editingTransaction.account || 'Cheques');
         } else {
             reset();
         }
@@ -40,6 +42,7 @@ export default function TransactionForm({ onSubmit, editingTransaction, onCancel
         // Keep date as is or reset to today
         setType('ingreso');
         setCategory(CATEGORIES[0]);
+        setAccount('Cheques');
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -51,6 +54,7 @@ export default function TransactionForm({ onSubmit, editingTransaction, onCancel
             date,
             type,
             category: type === 'egreso' ? category : 'INGRESO',
+            account,
             updatedAt: new Date().toISOString(),
         });
         if (!editingTransaction) reset();
@@ -78,7 +82,7 @@ export default function TransactionForm({ onSubmit, editingTransaction, onCancel
                 />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <input
                     type="date"
                     value={date}
@@ -93,6 +97,15 @@ export default function TransactionForm({ onSubmit, editingTransaction, onCancel
                 >
                     <option value="ingreso">Ingreso</option>
                     <option value="egreso">Egreso</option>
+                </select>
+                <select
+                    value={account}
+                    onChange={(e) => setAccount(e.target.value as AccountType)}
+                    className="w-full p-3 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                    {ACCOUNTS.map((acc) => (
+                        <option key={acc} value={acc}>{acc}</option>
+                    ))}
                 </select>
             </div>
 

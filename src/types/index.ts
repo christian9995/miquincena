@@ -1,4 +1,7 @@
 export type TransactionType = 'ingreso' | 'egreso';
+export type AccountType = 'Cheques' | 'Ahorros' | 'Efectivo';
+
+export const ACCOUNTS: AccountType[] = ['Cheques', 'Ahorros', 'Efectivo'];
 
 export interface Transaction {
     id: string; // Unique identifier for transaction identity-based merging
@@ -7,6 +10,7 @@ export interface Transaction {
     date: string;
     type: TransactionType;
     category: string;
+    account: AccountType; // Account used for this transaction
     updatedAt: string; // ISO timestamp for sync conflict resolution
 }
 
