@@ -1,8 +1,15 @@
 'use client';
 
-import { Transaction, Budgets } from '@/types';
+import { Transaction, Budgets, AccountType, ACCOUNTS } from '@/types';
 import { getPeriodDates, formatCurrency } from '@/lib/finance-utils';
 import { useMemo } from 'react';
+import { Wallet, PiggyBank, Banknote } from 'lucide-react';
+
+const ACCOUNT_CONFIG: Record<AccountType, { icon: typeof Wallet; color: string; bg: string; border: string }> = {
+    'Cheques': { icon: Wallet, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200' },
+    'Ahorros': { icon: PiggyBank, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200' },
+    'Efectivo': { icon: Banknote, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200' },
+};
 
 interface AnnualReportModalProps {
     isOpen: boolean;
@@ -13,6 +20,33 @@ interface AnnualReportModalProps {
 }
 
 export default function AnnualReportModal({ isOpen, onClose, transactions, budgets, seedDate }: AnnualReportModalProps) {
+    // Calculate account balances
+    const accountBalances = useMemo(() => {
+        const balances: Record<AccountType, { income: number; expense: number; balance: number }> = {
+            'Cheques': { income: 0, expense: 0, balance: 0 },
+            'Ahorros': { income: 0, expense: 0, balance: 0 },
+            'Efectivo': { income: 0, expense: 0, balance: 0 },
+        };
+
+        transactions.forEach((t) => {
+            const account = t.account || 'Cheques'; // Default to Cheques for legacy transactions
+            const amount = Number(t.amount);
+            
+            if (t.type === 'ingreso') {
+                balances[account].income += amount;
+            } else {
+                balances[account].expense += amount;
+            }
+        });
+
+        // Calculate balance for each account
+        ACCOUNTS.forEach((acc) => {
+            balances[acc].balance = balances[acc].income - balances[acc].expense;
+        });
+
+        return balances;
+    }, [transactions]);
+
     const reportData = useMemo(() => {
         let totals = { ing: 0, egr: 0, mIng: 0, lEgr: 0, dIng: 0, dEgr: 0 };
         const rows = Array.from({ length: 26 }).map((_, i) => {
@@ -62,6 +96,38 @@ export default function AnnualReportModal({ isOpen, onClose, transactions, budge
                 </div>
 
                 <div className="flex-1 overflow-y-auto">
+                    {/* Estado de Cuentas Section */}
+                    <div className="p-4 border-b border-gray-200 bg-gray-50">
+                        <h4 className="text-sm font-bold text-gray-700 mb-3 text-center">Estado de Cuentas</h4>
+                        <div className="grid grid-cols-3 gap-3">
+                            {ACCOUNTS.map((acc) => {
+                                const config = ACCOUNT_CONFIG[acc];
+                                const Icon = config.icon;
+                                const data = accountBalances[acc];
+                                
+                                return (
+                                    <div 
+                                        key={acc} 
+                                        className={`${config.bg} ${config.border} border rounded-xl p-3 text-center`}
+                                    >
+                                        <div className="flex items-center justify-center gap-1 mb-1">
+                                            <Icon size={16} className={config.color} />
+                                            <span className={`text-xs font-semibold ${config.color}`}>{acc}</span>
+                                        </div>
+                                        <div className={`text-lg font-black ${data.balance >= 0 ? 'text-gray-800' : 'text-red-600'}`}>
+                                            {formatCurrency(data.balance)}
+                                        </div>
+                                        <div className="text-[10px] text-gray-500 mt-1">
+                                            <span className="text-green-600">+{formatCurrency(data.income)}</span>
+                                            {' / '}
+                                            <span className="text-red-600">-{formatCurrency(data.expense)}</span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
                     <div className="p-3">
                         <table className="w-full text-xs text-right border-collapse">
                             <thead className="sticky top-0 bg-gray-50 z-10 shadow-sm">
