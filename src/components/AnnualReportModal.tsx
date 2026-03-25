@@ -34,8 +34,17 @@ export default function AnnualReportModal({ isOpen, onClose, transactions, budge
             
             if (t.type === 'ingreso') {
                 balances[account].income += amount;
-            } else {
+            } else if (t.type === 'egreso') {
                 balances[account].expense += amount;
+            } else if (t.type === 'transferencia') {
+                // Transfers: subtract from source, add to destination
+                const sourceAccount = account;
+                const destinationAccount = t.accountTo || 'Cheques';
+                
+                // Subtract from source account (treat as expense for that account)
+                balances[sourceAccount].expense += amount;
+                // Add to destination account (treat as income for that account)
+                balances[destinationAccount].income += amount;
             }
         });
 
@@ -57,7 +66,12 @@ export default function AnnualReportModal({ isOpen, onClose, transactions, budge
             transactions.forEach(t => {
                 const d = new Date(t.date + 'T00:00:00');
                 if (d >= start && d <= end) {
-                    t.type === 'ingreso' ? qIng += Number(t.amount) : qEgr += Number(t.amount);
+                    // Only count ingreso and egreso for period totals (transfers are neutral)
+                    if (t.type === 'ingreso') {
+                        qIng += Number(t.amount);
+                    } else if (t.type === 'egreso') {
+                        qEgr += Number(t.amount);
+                    }
                 }
             });
 
