@@ -22,7 +22,6 @@ export default function TransactionForm({ onSubmit, editingTransaction, onCancel
     const [type, setType] = useState<TransactionType>('ingreso');
     const [category, setCategory] = useState(CATEGORIES[0]);
     const [account, setAccount] = useState<AccountType>('Cheques');
-    const [toAccount, setToAccount] = useState<AccountType>('Ahorros');
 
     useEffect(() => {
         if (editingTransaction) {
@@ -32,7 +31,6 @@ export default function TransactionForm({ onSubmit, editingTransaction, onCancel
             setType(editingTransaction.type);
             setCategory(editingTransaction.category as any);
             setAccount(editingTransaction.account || 'Cheques');
-            setToAccount(editingTransaction.toAccount || 'Ahorros');
         } else {
             reset();
         }
@@ -45,27 +43,18 @@ export default function TransactionForm({ onSubmit, editingTransaction, onCancel
         setType('ingreso');
         setCategory(CATEGORIES[0]);
         setAccount('Cheques');
-        setToAccount('Ahorros');
     };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        
-        // Validate transfer: origin and destination must be different
-        if (type === 'transferencia' && account === toAccount) {
-            alert('La cuenta de origen y destino deben ser diferentes.');
-            return;
-        }
-        
         onSubmit({
             id: `tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // Unique transaction ID
-            desc: type === 'transferencia' ? (desc || `Transferencia ${account} a ${toAccount}`) : desc,
+            desc,
             amount: parseFloat(amount),
             date,
             type,
-            category: type === 'egreso' ? category : (type === 'transferencia' ? 'TRANSFERENCIA' : 'INGRESO'),
+            category: type === 'egreso' ? category : 'INGRESO',
             account,
-            toAccount: type === 'transferencia' ? toAccount : undefined,
             updatedAt: new Date().toISOString(),
         });
         if (!editingTransaction) reset();
@@ -93,7 +82,7 @@ export default function TransactionForm({ onSubmit, editingTransaction, onCancel
                 />
             </div>
 
-            <div className={`grid grid-cols-1 gap-4 ${type === 'transferencia' ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <input
                     type="date"
                     value={date}
@@ -108,40 +97,16 @@ export default function TransactionForm({ onSubmit, editingTransaction, onCancel
                 >
                     <option value="ingreso">Ingreso</option>
                     <option value="egreso">Egreso</option>
-                    <option value="transferencia">Transferencia</option>
                 </select>
-                {type === 'transferencia' ? (
-                    <>
-                        <select
-                            value={account}
-                            onChange={(e) => setAccount(e.target.value as AccountType)}
-                            className="w-full p-3 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                            {ACCOUNTS.map((acc) => (
-                                <option key={acc} value={acc}>De: {acc}</option>
-                            ))}
-                        </select>
-                        <select
-                            value={toAccount}
-                            onChange={(e) => setToAccount(e.target.value as AccountType)}
-                            className="w-full p-3 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                            {ACCOUNTS.map((acc) => (
-                                <option key={acc} value={acc}>A: {acc}</option>
-                            ))}
-                        </select>
-                    </>
-                ) : (
-                    <select
-                        value={account}
-                        onChange={(e) => setAccount(e.target.value as AccountType)}
-                        className="w-full p-3 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                        {ACCOUNTS.map((acc) => (
-                            <option key={acc} value={acc}>{acc}</option>
-                        ))}
-                    </select>
-                )}
+                <select
+                    value={account}
+                    onChange={(e) => setAccount(e.target.value as AccountType)}
+                    className="w-full p-3 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                    {ACCOUNTS.map((acc) => (
+                        <option key={acc} value={acc}>{acc}</option>
+                    ))}
+                </select>
             </div>
 
             {type === 'egreso' && (

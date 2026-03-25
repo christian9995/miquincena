@@ -1,4 +1,4 @@
-export type TransactionType = 'ingreso' | 'egreso' | 'transferencia';
+export type TransactionType = 'ingreso' | 'egreso';
 export type AccountType = 'Cheques' | 'Ahorros' | 'Efectivo';
 
 export const ACCOUNTS: AccountType[] = ['Cheques', 'Ahorros', 'Efectivo'];
@@ -10,8 +10,7 @@ export interface Transaction {
     date: string;
     type: TransactionType;
     category: string;
-    account: AccountType; // Account used for this transaction (origin for transfers)
-    toAccount?: AccountType; // Destination account for transfers
+    account: AccountType; // Account used for this transaction
     updatedAt: string; // ISO timestamp for sync conflict resolution
 }
 
