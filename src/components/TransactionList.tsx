@@ -10,6 +10,8 @@ const ACCOUNT_COLORS: Record<string, string> = {
     'Efectivo': 'text-amber-600 bg-amber-50',
 };
 
+const TRANSFER_COLOR = 'text-gray-600 bg-gray-50';
+
 interface TransactionListProps {
     transactions: Transaction[];
     onEdit: (index: number) => void;
@@ -51,13 +53,26 @@ export default function TransactionList({ transactions, onEdit, onDelete, search
 
                         <div className="flex items-center gap-4">
                             <div className="text-right">
-                                <span className={`text-lg font-black ${t.type === 'ingreso' ? 'text-green-600' : 'text-red-600'}`}>
-                                    {t.type === 'ingreso' ? '+' : '-'}{formatCurrency(Number(t.amount))}
-                                </span>
-                                {t.account && (
-                                    <span className={`ml-2 text-xs px-2 py-0.5 rounded inline-flex items-center gap-1 ${ACCOUNT_COLORS[t.account] || 'text-gray-600 bg-gray-50'}`}>
-                                        <Wallet size={10} /> {t.account}
-                                    </span>
+                                {t.type === 'transferencia' ? (
+                                    <>
+                                        <div className={`text-sm font-bold ${TRANSFER_COLOR}`}>
+                                            Transferencia: {t.account} ➔ {t.accountTo || 'N/A'}
+                                        </div>
+                                        <span className={`text-lg font-black text-gray-600 block mt-1`}>
+                                            {formatCurrency(Number(t.amount))}
+                                        </span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className={`text-lg font-black ${t.type === 'ingreso' ? 'text-green-600' : 'text-red-600'}`}>
+                                            {t.type === 'ingreso' ? '+' : '-'}{formatCurrency(Number(t.amount))}
+                                        </span>
+                                        {t.account && (
+                                            <span className={`ml-2 text-xs px-2 py-0.5 rounded inline-flex items-center gap-1 ${ACCOUNT_COLORS[t.account] || 'text-gray-600 bg-gray-50'}`}>
+                                                <Wallet size={10} /> {t.account}
+                                            </span>
+                                        )}
+                                    </>
                                 )}
                             </div>
                             <div className="flex gap-1">
