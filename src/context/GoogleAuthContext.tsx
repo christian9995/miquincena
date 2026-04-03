@@ -13,11 +13,13 @@ interface GoogleAuthContextType {
   lastSyncTime: number | null;
   isOnline: boolean;
   hasPendingSync: boolean;
+  shouldImmediateSync: boolean; // Flag to trigger immediate sync on resume
   signIn: (response: GoogleAuthResponse) => Promise<void>;
   signOut: () => Promise<void>;
   error: string | null;
   updateSyncStatus: (isSyncing: boolean, status?: 'synced' | 'pending' | 'error' | 'offline') => void;
   triggerPendingSync: () => Promise<void>;
+  clearImmediateSyncFlag: () => void;
 }
 
 const GoogleAuthContext = createContext<GoogleAuthContextType | undefined>(undefined);
@@ -33,6 +35,7 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [hasPendingSync, setHasPendingSync] = useState(false);
+  const [shouldImmediateSync, setShouldImmediateSync] = useState(false);
   const connectionRetryTimerRef = React.useRef<NodeJS.Timeout | null>(null);
   const retryCountRef = React.useRef(0);
   const tokenRefreshTimerRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -74,10 +77,11 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     const isReachable = await verifyAPIReachability();
     if (isReachable && isAuthenticated) {
-      console.log('[v0] API is reachable - connection restored');
+      console.log('[v0] API is reachable - connection restored, triggering sync');
       setIsOnline(true);
       setSyncStatus('pending');
       setHasPendingSync(true);
+      setShouldImmediateSync(true); // Trigger immediate sync
       retryCountRef.current = 0; // Reset on successful connection
     } else if (retryCountRef.current < 5) {
       // Schedule next attempt
@@ -111,9 +115,11 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setIsOnline(true);
       retryCountRef.current = 0;
       if (isAuthenticated) {
-        console.log('[v0] Connection restored and authenticated - marking for sync');
+        console.log('[v0] Connection restored and authenticated - triggering immediate sync');
         setSyncStatus('pending');
         setHasPendingSync(true);
+        // Trigger immediate sync when connection is restored
+        setShouldImmediateSync(true);
       }
     };
 
@@ -158,19 +164,20 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         // Immediate focus refresh when returning to tab
         forceRefreshSyncStatus();
         
-        if (isAuthenticated && isOnline) {
+        if (isAuthenticated) {
           // Verify connection is still alive before triggering sync
           verifyAPIReachability().then((isReachable) => {
             if (isReachable) {
-              setSyncStatus('synced');
-              setHasPendingSync(false);
+              setIsOnline(true);
+              setSyncStatus('pending');
+              // Trigger immediate sync when returning to foreground
+              setShouldImmediateSync(true);
             } else {
+              setIsOnline(false);
               setSyncStatus('offline');
               attemptReconnection();
             }
           });
-        } else if (isAuthenticated && !isOnline) {
-          attemptReconnection();
         }
       }
     };
@@ -437,6 +444,10 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setHasPendingSync(false);
   }, []);
 
+  const clearImmediateSyncFlag = useCallback(() => {
+    setShouldImmediateSync(false);
+  }, []);
+
   return (
     <GoogleAuthContext.Provider
       value={{
@@ -452,8 +463,10 @@ export const GoogleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         lastSyncTime,
         isOnline,
         hasPendingSync,
+        shouldImmediateSync,
         updateSyncStatus,
         triggerPendingSync,
+        clearImmediateSyncFlag,
       }}
     >
       {children}
