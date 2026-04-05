@@ -10,6 +10,7 @@ import { resolveSyncConflict, deepMergeAppState, mirrorSyncFromCloud } from '@/l
 const STORAGE_KEY_TRANSACTIONS = 'finanzas_v2026';
 const STORAGE_KEY_BUDGETS = 'presupuestos_v2026';
 const STORAGE_KEY_SEED_DATE = 'fecha_semilla_2026';
+const STORAGE_KEY_DELETED_IDS = 'deleted_ids_v2026';
 const STORAGE_KEY_SYNC_QUEUE = 'google_sync_queue_v2026';
 const STORAGE_KEY_LOCAL_TIMESTAMP = 'local_data_timestamp_v2026';
 const SYNC_DEBOUNCE_MS = 3000;
@@ -18,6 +19,7 @@ const AUTO_PULL_INTERVAL_MS = 30000; // 30 seconds for cross-device sync
 export function useFinance() {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [budgets, setBudgets] = useState<Budgets>({});
+    const [deletedIds, setDeletedIds] = useState<string[]>([]);
     const [currentPeriodIndex, setCurrentPeriodIndex] = useState(0);
     const [isInitialized, setIsInitialized] = useState(false);
     const [seedDate, setSeedDate] = useState('2026-01-02');
@@ -365,6 +367,15 @@ export function useFinance() {
     };
 
     const deleteTransaction = (index: number) => {
+        // Get the transaction ID before deleting
+        const txToDelete = transactions[index];
+        if (txToDelete?.id) {
+            // Add to deletedIds registry before removing
+            setDeletedIds((prev) => {
+                if (prev.includes(txToDelete.id)) return prev;
+                return [...prev, txToDelete.id];
+            });
+        }
         setTransactions((prev) => prev.filter((_, i) => i !== index));
     };
 

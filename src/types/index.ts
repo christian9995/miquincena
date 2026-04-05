@@ -62,4 +62,5 @@ export interface AppState {
     budgets: Budgets;
     seedDate: string;
     timestamp: number;
+    deletedIds?: string[]; // Registry of deleted transaction IDs for sync
 }
