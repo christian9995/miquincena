@@ -22,11 +22,10 @@ export function useFinance() {
     const [isInitialized, setIsInitialized] = useState(false);
     const [seedDate, setSeedDate] = useState('2026-01-02');
     
-    const { isAuthenticated, accessToken, updateSyncStatus, triggerPendingSync, isOnline, shouldImmediateSync, clearImmediateSyncFlag } = useGoogleAuth();
+    const { isAuthenticated, accessToken, updateSyncStatus, triggerPendingSync, isOnline } = useGoogleAuth();
     const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const autoPullIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const localTimestampRef = useRef<number>(0);
-    const immediateSyncInProgressRef = useRef<boolean>(false);
 
     // Deduplicate transactions by ID (cleanup for any previous bugs)
     const deduplicateTransactions = (txs: Transaction[]): Transaction[] => {
@@ -307,71 +306,6 @@ export function useFinance() {
             }
         };
     }, [isInitialized, isAuthenticated, accessToken, isOnline, updateSyncStatus]);
-
-    // Immediate sync when app returns to foreground (visibility change)
-    useEffect(() => {
-        if (!shouldImmediateSync || !isAuthenticated || !accessToken || !isOnline) {
-            return;
-        }
-
-        // Prevent multiple simultaneous syncs
-        if (immediateSyncInProgressRef.current) {
-            return;
-        }
-
-        const performImmediateSync = async () => {
-            immediateSyncInProgressRef.current = true;
-            clearImmediateSyncFlag();
-
-            try {
-                updateSyncStatus(true);
-
-                // Get the cloud timestamp
-                const cloudTimestamp = await getCloudTimestamp(accessToken);
-                if (!cloudTimestamp) {
-                    updateSyncStatus(false, 'synced');
-                    immediateSyncInProgressRef.current = false;
-                    return;
-                }
-
-                const localTimestamp = localTimestampRef.current || 
-                    parseInt(localStorage.getItem(STORAGE_KEY_LOCAL_TIMESTAMP) || '0');
-
-                // If cloud is newer, pull the data
-                if (cloudTimestamp > localTimestamp) {
-                    const driveData = await loadAppStateFromDrive(accessToken);
-                    if (driveData) {
-                        const localState = {
-                            transactions: JSON.parse(localStorage.getItem(STORAGE_KEY_TRANSACTIONS) || '[]'),
-                            budgets: JSON.parse(localStorage.getItem(STORAGE_KEY_BUDGETS) || '{}'),
-                            seedDate: localStorage.getItem(STORAGE_KEY_SEED_DATE) || '2026-01-02',
-                            timestamp: localTimestamp,
-                        };
-
-                        const mirrored = mirrorSyncFromCloud(localState, driveData);
-                        const dedupedTransactions = deduplicateTransactions(mirrored.transactions);
-
-                        setTransactions(dedupedTransactions);
-                        setBudgets(mirrored.budgets);
-                        if (mirrored.seedDate) setSeedDate(mirrored.seedDate);
-
-                        localStorage.setItem(STORAGE_KEY_TRANSACTIONS, JSON.stringify(dedupedTransactions));
-                        localStorage.setItem(STORAGE_KEY_BUDGETS, JSON.stringify(mirrored.budgets));
-                        localStorage.setItem(STORAGE_KEY_LOCAL_TIMESTAMP, cloudTimestamp.toString());
-                        localTimestampRef.current = cloudTimestamp;
-                    }
-                }
-
-                updateSyncStatus(false, 'synced');
-            } catch (err) {
-                updateSyncStatus(false, 'offline');
-            } finally {
-                immediateSyncInProgressRef.current = false;
-            }
-        };
-
-        performImmediateSync();
-    }, [shouldImmediateSync, isAuthenticated, accessToken, isOnline, clearImmediateSyncFlag, updateSyncStatus]);
 
     const currentPeriodData = useMemo(() => {
         const { start, end } = getPeriodDates(currentPeriodIndex, seedDate);
