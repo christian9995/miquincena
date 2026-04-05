@@ -32,9 +32,11 @@ export async function verifyAPIConnectivity(): Promise<boolean> {
 }
 
 /**
- * Mirror Sync from Cloud
- * When cloud timestamp is newer, make local state EXACTLY match cloud
- * This ensures deletions are reflected across devices
+ * Mirror Sync from Cloud with Upsert Logic
+ * When cloud timestamp is newer, use cloud data with upsert behavior:
+ * - If a transaction ID exists locally, overwrite with cloud version
+ * - If a transaction ID doesn't exist locally, add it
+ * - Cloud always takes priority during auto-pull
  */
 export function mirrorSyncFromCloud(
   local: AppState,
@@ -43,10 +45,39 @@ export function mirrorSyncFromCloud(
   const localTimestamp = local.timestamp || 0;
   const remoteTimestamp = remote.timestamp || 0;
 
-  // If cloud is newer, use cloud data exactly (mirror sync)
+  // If cloud is newer, use cloud data with upsert logic
   if (remoteTimestamp > localTimestamp) {
+    // Use Map for upsert: cloud transactions take priority
+    const txMap = new Map<string, AppState['transactions'][0]>();
+    
+    // First, add all local transactions to the map
+    for (const localTx of (local.transactions || [])) {
+      if (localTx.id && localTx.id.startsWith('tx_')) {
+        txMap.set(localTx.id, localTx);
+      }
+    }
+    
+    // Then, upsert all cloud transactions (cloud takes priority)
+    for (const remoteTx of (remote.transactions || [])) {
+      if (remoteTx.id && remoteTx.id.startsWith('tx_')) {
+        // Cloud version overwrites local version (upsert)
+        txMap.set(remoteTx.id, remoteTx);
+      }
+    }
+    
+    // Remove any transactions that exist locally but not in cloud (deletions)
+    const remoteIds = new Set((remote.transactions || []).map(t => t.id));
+    for (const localTx of (local.transactions || [])) {
+      if (localTx.id && !remoteIds.has(localTx.id)) {
+        // Transaction was deleted in cloud, remove locally
+        txMap.delete(localTx.id);
+      }
+    }
+    
+    const mergedTransactions = Array.from(txMap.values());
+    
     return {
-      transactions: remote.transactions || [],
+      transactions: mergedTransactions,
       budgets: remote.budgets || {},
       seedDate: remote.seedDate || local.seedDate,
       timestamp: remoteTimestamp,

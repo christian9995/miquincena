@@ -51,7 +51,8 @@ export default function TransactionForm({ onSubmit, editingTransaction, onCancel
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         onSubmit({
-            id: `tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // Unique transaction ID
+            // Preserve existing ID when editing, only generate new ID for new transactions
+            id: editingTransaction?.id || `tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             desc,
             amount: parseFloat(amount),
             date,
