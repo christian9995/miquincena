@@ -5,12 +5,25 @@
 
 const FILE_NAME = 'miquincena-data.json';
 
+export interface Workspace {
+  id: string;
+  name: string;
+  transactions: any[];
+  budgets: Record<string, any>;
+  deletedIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AppState {
   transactions: any[];
   budgets: Record<string, any>;
   seedDate: string;
   timestamp: number;
   deletedIds?: string[]; // Registry of deleted transaction IDs for sync
+  // Multi-workspace support
+  workspaces?: Workspace[];
+  activeWorkspaceId?: string;
 }
 
 interface DriveFile {

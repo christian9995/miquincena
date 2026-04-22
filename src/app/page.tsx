@@ -26,6 +26,14 @@ export default function Home() {
     isInitialized,
     seedDate,
     setSeedDate,
+    // Workspace exports
+    workspaces,
+    activeWorkspace,
+    activeWorkspaceId,
+    createWorkspace,
+    renameWorkspace,
+    deleteWorkspace,
+    switchWorkspace,
   } = useFinance() as any; // Casting for simplicity in this step, ideally use proper types
 
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -58,7 +66,15 @@ export default function Home() {
 
   return (
     <>
-      <Header />
+      <Header
+        workspaces={workspaces || []}
+        activeWorkspace={activeWorkspace}
+        activeWorkspaceId={activeWorkspaceId}
+        onCreateWorkspace={createWorkspace}
+        onRenameWorkspace={renameWorkspace}
+        onDeleteWorkspace={deleteWorkspace}
+        onSwitchWorkspace={switchWorkspace}
+      />
       <main className="min-h-screen bg-[#f8f9fc] p-4 md:p-8">
         <div className="max-w-7xl mx-auto">
           <PeriodSelector

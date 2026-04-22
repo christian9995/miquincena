@@ -56,6 +56,17 @@ export interface GoogleUserInfo {
     picture?: string;
 }
 
+// Workspace Types
+export interface Workspace {
+    id: string;
+    name: string;
+    transactions: Transaction[];
+    budgets: Budgets;
+    deletedIds: string[];
+    createdAt: string;
+    updatedAt: string;
+}
+
 // Sync Types
 export interface AppState {
     transactions: Transaction[];
@@ -63,4 +74,7 @@ export interface AppState {
     seedDate: string;
     timestamp: number;
     deletedIds?: string[]; // Registry of deleted transaction IDs for sync
+    // Multi-workspace support
+    workspaces?: Workspace[];
+    activeWorkspaceId?: string;
 }

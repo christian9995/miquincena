@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Transaction, Budgets, TransactionType } from '@/types';
+import { Transaction, Budgets, TransactionType, Workspace } from '@/types';
 import { getCurrentPeriodIndex, getPeriodDates } from '@/lib/finance-utils';
 import { useGoogleAuth } from '@/context/GoogleAuthContext';
 import { saveAppStateToDrive, loadAppStateFromDrive, getCloudTimestamp } from '@/lib/google-drive';
@@ -13,18 +13,70 @@ const STORAGE_KEY_SEED_DATE = 'fecha_semilla_2026';
 const STORAGE_KEY_DELETED_IDS = 'deleted_ids_v2026';
 const STORAGE_KEY_SYNC_QUEUE = 'google_sync_queue_v2026';
 const STORAGE_KEY_LOCAL_TIMESTAMP = 'local_data_timestamp_v2026';
+const STORAGE_KEY_WORKSPACES = 'workspaces_v2026';
+const STORAGE_KEY_ACTIVE_WORKSPACE = 'active_workspace_v2026';
 const SYNC_DEBOUNCE_MS = 3000;
 const AUTO_PULL_INTERVAL_MS = 30000; // 30 seconds for cross-device sync
 
+// Helper to create a default workspace
+const createDefaultWorkspace = (existingTransactions: Transaction[] = [], existingBudgets: Budgets = {}): Workspace => ({
+    id: `ws_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    name: 'Cuenta Principal',
+    transactions: existingTransactions,
+    budgets: existingBudgets,
+    deletedIds: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+});
+
 export function useFinance() {
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
-    const [budgets, setBudgets] = useState<Budgets>({});
-    const [deletedIds, setDeletedIds] = useState<string[]>([]);
+    const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+    const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
     const [currentPeriodIndex, setCurrentPeriodIndex] = useState(0);
     const [isInitialized, setIsInitialized] = useState(false);
     const [seedDate, setSeedDate] = useState('2026-01-02');
+
+    // Derived state for active workspace
+    const activeWorkspace = useMemo(() => 
+        workspaces.find(ws => ws.id === activeWorkspaceId) || workspaces[0] || null,
+        [workspaces, activeWorkspaceId]
+    );
+    
+    // Get transactions and budgets from active workspace
+    const transactions = activeWorkspace?.transactions || [];
+    const budgets = activeWorkspace?.budgets || {};
+    const deletedIds = activeWorkspace?.deletedIds || [];
     
     const { isAuthenticated, accessToken, updateSyncStatus, triggerPendingSync, isOnline } = useGoogleAuth();
+
+    // Helper to update the active workspace
+    const updateActiveWorkspace = useCallback((updater: (ws: Workspace) => Workspace) => {
+        setWorkspaces(prev => prev.map(ws => 
+            ws.id === activeWorkspaceId ? { ...updater(ws), updatedAt: new Date().toISOString() } : ws
+        ));
+    }, [activeWorkspaceId]);
+
+    // Wrapper setters that update the active workspace
+    const setTransactions = useCallback((updater: Transaction[] | ((prev: Transaction[]) => Transaction[])) => {
+        updateActiveWorkspace(ws => ({
+            ...ws,
+            transactions: typeof updater === 'function' ? updater(ws.transactions) : updater,
+        }));
+    }, [updateActiveWorkspace]);
+
+    const setBudgets = useCallback((updater: Budgets | ((prev: Budgets) => Budgets)) => {
+        updateActiveWorkspace(ws => ({
+            ...ws,
+            budgets: typeof updater === 'function' ? updater(ws.budgets) : updater,
+        }));
+    }, [updateActiveWorkspace]);
+
+    const setDeletedIds = useCallback((updater: string[] | ((prev: string[]) => string[])) => {
+        updateActiveWorkspace(ws => ({
+            ...ws,
+            deletedIds: typeof updater === 'function' ? updater(ws.deletedIds) : updater,
+        }));
+    }, [updateActiveWorkspace]);
     const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const autoPullIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const localTimestampRef = useRef<number>(0);
@@ -67,31 +119,38 @@ export function useFinance() {
                         const driveData = await loadAppStateFromDrive(accessToken);
                         
                         if (driveData) {
-                            // Deep merge with transaction-level identity tracking
-                            const merged = deepMergeAppState(localData, driveData);
-                            
-                            // Deduplicate before setting state
-                            const dedupedTransactions = deduplicateTransactions(merged.transactions);
-                            
-                            setTransactions(dedupedTransactions);
-                            setBudgets(merged.budgets);
-                            setSeedDate(merged.seedDate);
-                            
-                            // Save deduped data back to localStorage
-                            localStorage.setItem(STORAGE_KEY_TRANSACTIONS, JSON.stringify(dedupedTransactions));
-                            localStorage.setItem(STORAGE_KEY_BUDGETS, JSON.stringify(merged.budgets));
+                            // Check if drive data has workspaces
+                            if (driveData.workspaces && driveData.workspaces.length > 0) {
+                                // Use workspace data from cloud
+                                const cloudWorkspaces = driveData.workspaces.map(ws => ({
+                                    ...ws,
+                                    transactions: deduplicateTransactions(ws.transactions || []),
+                                }));
+                                setWorkspaces(cloudWorkspaces);
+                                setActiveWorkspaceId(driveData.activeWorkspaceId || cloudWorkspaces[0]?.id);
+                            } else {
+                                // Legacy data - migrate to workspace format
+                                const merged = deepMergeAppState(localData, driveData);
+                                const dedupedTransactions = deduplicateTransactions(merged.transactions);
+                                const migratedWorkspace = createDefaultWorkspace(dedupedTransactions, merged.budgets);
+                                setWorkspaces([migratedWorkspace]);
+                                setActiveWorkspaceId(migratedWorkspace.id);
+                                setSeedDate(merged.seedDate);
+                            }
                             
                             updateSyncStatus(false, 'synced');
-                            console.log('[v0] Deep merge complete with deduplication');
+                            console.log('[v0] Sync complete');
                             
-                            // After merging, set current period based on today's date
-                            const todayPeriodIndex = getCurrentPeriodIndex(new Date(), merged.seedDate);
+                            // After syncing, set current period based on today's date
+                            const todayPeriodIndex = getCurrentPeriodIndex(new Date(), seedDate);
                             setCurrentPeriodIndex(todayPeriodIndex);
                         } else {
                             // No remote data - upload local data
                             console.log('[v0] No data in Google Drive, uploading local data');
                             await saveAppStateToDrive(accessToken, {
                                 ...localData,
+                                workspaces: workspaces,
+                                activeWorkspaceId: activeWorkspaceId,
                                 timestamp: Date.now(),
                             });
                             updateSyncStatus(false, 'synced');
@@ -109,26 +168,57 @@ export function useFinance() {
         };
 
         const loadFromLocalStorage = () => {
+            // Try to load workspaces first (new format)
+            const savedWorkspaces = localStorage.getItem(STORAGE_KEY_WORKSPACES);
+            const savedActiveWorkspace = localStorage.getItem(STORAGE_KEY_ACTIVE_WORKSPACE);
+            const savedSeedDate = localStorage.getItem(STORAGE_KEY_SEED_DATE);
+
+            let parsedSeedDate = '2026-01-02';
+            if (savedSeedDate) {
+                parsedSeedDate = savedSeedDate;
+                setSeedDate(parsedSeedDate);
+            }
+
+            if (savedWorkspaces) {
+                try {
+                    const parsed = JSON.parse(savedWorkspaces) as Workspace[];
+                    // Deduplicate transactions in each workspace
+                    const cleanedWorkspaces = parsed.map(ws => ({
+                        ...ws,
+                        transactions: deduplicateTransactions(ws.transactions || []),
+                    }));
+                    setWorkspaces(cleanedWorkspaces);
+                    setActiveWorkspaceId(savedActiveWorkspace || cleanedWorkspaces[0]?.id || null);
+                    
+                    // Set current period based on today's date
+                    const todayPeriodIndex = getCurrentPeriodIndex(new Date(), parsedSeedDate);
+                    setCurrentPeriodIndex(todayPeriodIndex);
+                    setIsInitialized(true);
+
+                    return {
+                        transactions: cleanedWorkspaces[0]?.transactions || [],
+                        budgets: cleanedWorkspaces[0]?.budgets || {},
+                        seedDate: parsedSeedDate,
+                        timestamp: Date.now(),
+                        workspaces: cleanedWorkspaces,
+                        activeWorkspaceId: savedActiveWorkspace || cleanedWorkspaces[0]?.id,
+                    };
+                } catch (e) {
+                    console.error("Error parsing workspaces", e);
+                }
+            }
+
+            // Fallback: migrate from old format
             const savedTransactions = localStorage.getItem(STORAGE_KEY_TRANSACTIONS);
             const savedBudgets = localStorage.getItem(STORAGE_KEY_BUDGETS);
-            const savedSeedDate = localStorage.getItem(STORAGE_KEY_SEED_DATE);
 
             let parsedTransactions: Transaction[] = [];
             let parsedBudgets: Budgets = {};
-            let parsedSeedDate = '2026-01-02';
 
             if (savedTransactions) {
                 try {
                     const raw = JSON.parse(savedTransactions);
-                    // Deduplicate on load to clean up any previous bugs
                     parsedTransactions = deduplicateTransactions(raw);
-                    setTransactions(parsedTransactions);
-                    
-                    // Save cleaned data back if there were duplicates
-                    if (parsedTransactions.length !== raw.length) {
-                        console.log('[v0] Cleaned', raw.length - parsedTransactions.length, 'duplicate transactions');
-                        localStorage.setItem(STORAGE_KEY_TRANSACTIONS, JSON.stringify(parsedTransactions));
-                    }
                 } catch (e) {
                     console.error("Error parsing transactions", e);
                 }
@@ -137,16 +227,15 @@ export function useFinance() {
             if (savedBudgets) {
                 try {
                     parsedBudgets = JSON.parse(savedBudgets);
-                    setBudgets(parsedBudgets);
                 } catch (e) {
                     console.error("Error parsing budgets", e);
                 }
             }
 
-            if (savedSeedDate) {
-                parsedSeedDate = savedSeedDate;
-                setSeedDate(parsedSeedDate);
-            }
+            // Create default workspace with migrated data
+            const defaultWorkspace = createDefaultWorkspace(parsedTransactions, parsedBudgets);
+            setWorkspaces([defaultWorkspace]);
+            setActiveWorkspaceId(defaultWorkspace.id);
 
             // Set current period based on today's date
             const todayPeriodIndex = getCurrentPeriodIndex(new Date(), parsedSeedDate);
@@ -158,30 +247,30 @@ export function useFinance() {
                 budgets: parsedBudgets,
                 seedDate: parsedSeedDate,
                 timestamp: Date.now(),
+                workspaces: [defaultWorkspace],
+                activeWorkspaceId: defaultWorkspace.id,
             };
         };
 
         initializeApp();
-    }, [isAuthenticated, accessToken, isOnline, updateSyncStatus]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isAuthenticated, accessToken, isOnline]);
 
     // Always save to localStorage immediately (Offline-First)
     // Queue sync to Google Drive when data changes
     useEffect(() => {
-        if (!isInitialized) return;
+        if (!isInitialized || workspaces.length === 0) return;
 
         // ALWAYS save to localStorage first
         const now = Date.now();
-        localStorage.setItem(STORAGE_KEY_TRANSACTIONS, JSON.stringify(transactions));
-        localStorage.setItem(STORAGE_KEY_BUDGETS, JSON.stringify(budgets));
+        localStorage.setItem(STORAGE_KEY_WORKSPACES, JSON.stringify(workspaces));
+        localStorage.setItem(STORAGE_KEY_ACTIVE_WORKSPACE, activeWorkspaceId || '');
         localStorage.setItem(STORAGE_KEY_SEED_DATE, seedDate);
         localStorage.setItem(STORAGE_KEY_LOCAL_TIMESTAMP, now.toString());
         localTimestampRef.current = now;
 
         // If authenticated and online, queue sync to Drive
         if (isAuthenticated && accessToken && isOnline) {
-            console.log('[v0] Drive sync eligible: authenticated=true, token exists, online=true');
-            console.log('[v0] Token length:', accessToken?.length);
-            
             updateSyncStatus(true);
 
             if (syncTimeoutRef.current) {
@@ -198,30 +287,24 @@ export function useFinance() {
                     }
 
                     updateSyncStatus(true);
-                    console.log('[v0] Starting Drive sync with token');
                     await saveAppStateToDrive(accessToken, {
-                        transactions,
-                        budgets,
+                        transactions: activeWorkspace?.transactions || [],
+                        budgets: activeWorkspace?.budgets || {},
                         seedDate,
                         timestamp: Date.now(),
+                        workspaces,
+                        activeWorkspaceId: activeWorkspaceId || undefined,
                     });
                     updateSyncStatus(false, 'synced');
-                    console.log('[v0] Drive sync completed successfully');
                 } catch (err) {
                     console.error('[v0] Error syncing to Drive:', err);
-                    console.log('[v0] Falling back to localStorage - data is safe locally');
                     updateSyncStatus(false, 'offline');
                 }
             }, SYNC_DEBOUNCE_MS);
         } else if (!isOnline && isAuthenticated) {
-            // Mark as pending sync when offline
-            console.log('[v0] Offline: marking data as pending sync');
             updateSyncStatus(false, 'pending');
         } else if (isAuthenticated && !accessToken) {
-            console.log('[v0] Authenticated but no access token available');
             updateSyncStatus(false, 'offline');
-        } else if (!isAuthenticated) {
-            console.log('[v0] Not authenticated, skipping Drive sync');
         }
 
         return () => {
@@ -229,7 +312,7 @@ export function useFinance() {
                 clearTimeout(syncTimeoutRef.current);
             }
         };
-    }, [transactions, budgets, seedDate, isInitialized, isAuthenticated, accessToken, isOnline, updateSyncStatus]);
+    }, [workspaces, activeWorkspaceId, seedDate, isInitialized, isAuthenticated, accessToken, isOnline, updateSyncStatus, activeWorkspace]);
 
     // Auto-pull polling: Check for cloud updates every 30 seconds for cross-device sync
     useEffect(() => {
@@ -260,27 +343,41 @@ export function useFinance() {
                     // Download full data from cloud
                     const driveData = await loadAppStateFromDrive(accessToken);
                     if (driveData) {
-                        // Get current local state
-                        const localState = {
-                            transactions: JSON.parse(localStorage.getItem(STORAGE_KEY_TRANSACTIONS) || '[]'),
-                            budgets: JSON.parse(localStorage.getItem(STORAGE_KEY_BUDGETS) || '{}'),
-                            seedDate: localStorage.getItem(STORAGE_KEY_SEED_DATE) || '2026-01-02',
-                            timestamp: localTimestamp,
-                        };
+                        // Check if cloud has workspaces
+                        if (driveData.workspaces && driveData.workspaces.length > 0) {
+                            // Use workspace data from cloud
+                            const cloudWorkspaces = driveData.workspaces.map(ws => ({
+                                ...ws,
+                                transactions: deduplicateTransactions(ws.transactions || []),
+                            }));
+                            setWorkspaces(cloudWorkspaces);
+                            if (driveData.activeWorkspaceId) {
+                                setActiveWorkspaceId(driveData.activeWorkspaceId);
+                            }
+                        } else {
+                            // Legacy data - mirror sync for backward compatibility
+                            const localState = {
+                                transactions: activeWorkspace?.transactions || [],
+                                budgets: activeWorkspace?.budgets || {},
+                                seedDate: localStorage.getItem(STORAGE_KEY_SEED_DATE) || '2026-01-02',
+                                timestamp: localTimestamp,
+                            };
 
-                        // Mirror sync: cloud is newer, so use cloud data exactly
-                        // This ensures deletions are reflected on other devices
-                        const mirrored = mirrorSyncFromCloud(localState, driveData);
-                        const dedupedTransactions = deduplicateTransactions(mirrored.transactions);
+                            const mirrored = mirrorSyncFromCloud(localState, driveData);
+                            const dedupedTransactions = deduplicateTransactions(mirrored.transactions);
 
-                        // Update state to exactly match cloud
-                        setTransactions(dedupedTransactions);
-                        setBudgets(mirrored.budgets);
-                        if (mirrored.seedDate) setSeedDate(mirrored.seedDate);
+                            // Update active workspace with mirrored data
+                            if (activeWorkspaceId) {
+                                setWorkspaces(prev => prev.map(ws => 
+                                    ws.id === activeWorkspaceId 
+                                        ? { ...ws, transactions: dedupedTransactions, budgets: mirrored.budgets, updatedAt: new Date().toISOString() }
+                                        : ws
+                                ));
+                            }
+                            if (mirrored.seedDate) setSeedDate(mirrored.seedDate);
+                        }
 
                         // Update local storage and timestamp
-                        localStorage.setItem(STORAGE_KEY_TRANSACTIONS, JSON.stringify(dedupedTransactions));
-                        localStorage.setItem(STORAGE_KEY_BUDGETS, JSON.stringify(mirrored.budgets));
                         localStorage.setItem(STORAGE_KEY_LOCAL_TIMESTAMP, cloudTimestamp.toString());
                         localTimestampRef.current = cloudTimestamp;
                     }
@@ -395,11 +492,55 @@ export function useFinance() {
             setTransactions([]);
             setBudgets({});
             setSeedDate('2026-01-02');
-            localStorage.removeItem(STORAGE_KEY_TRANSACTIONS);
-            localStorage.removeItem(STORAGE_KEY_BUDGETS);
+            localStorage.removeItem(STORAGE_KEY_WORKSPACES);
+            localStorage.removeItem(STORAGE_KEY_ACTIVE_WORKSPACE);
             localStorage.removeItem(STORAGE_KEY_SEED_DATE);
         }
     };
+
+    // Workspace CRUD Operations
+    const createWorkspace = useCallback((name: string) => {
+        const newWorkspace: Workspace = {
+            id: `ws_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            name,
+            transactions: [],
+            budgets: {},
+            deletedIds: [],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        };
+        setWorkspaces(prev => [...prev, newWorkspace]);
+        return newWorkspace.id;
+    }, []);
+
+    const renameWorkspace = useCallback((workspaceId: string, newName: string) => {
+        setWorkspaces(prev => prev.map(ws => 
+            ws.id === workspaceId 
+                ? { ...ws, name: newName, updatedAt: new Date().toISOString() }
+                : ws
+        ));
+    }, []);
+
+    const deleteWorkspace = useCallback((workspaceId: string) => {
+        // Don't allow deleting the last workspace
+        if (workspaces.length <= 1) return false;
+        
+        setWorkspaces(prev => prev.filter(ws => ws.id !== workspaceId));
+        
+        // If deleting the active workspace, switch to the first remaining one
+        if (activeWorkspaceId === workspaceId) {
+            const remaining = workspaces.filter(ws => ws.id !== workspaceId);
+            setActiveWorkspaceId(remaining[0]?.id || null);
+        }
+        return true;
+    }, [workspaces, activeWorkspaceId]);
+
+    const switchWorkspace = useCallback((workspaceId: string) => {
+        const exists = workspaces.some(ws => ws.id === workspaceId);
+        if (exists) {
+            setActiveWorkspaceId(workspaceId);
+        }
+    }, [workspaces]);
 
     return {
         transactions,
@@ -415,5 +556,13 @@ export function useFinance() {
         isInitialized,
         seedDate,
         setSeedDate,
+        // Workspace exports
+        workspaces,
+        activeWorkspace,
+        activeWorkspaceId,
+        createWorkspace,
+        renameWorkspace,
+        deleteWorkspace,
+        switchWorkspace,
     };
 }

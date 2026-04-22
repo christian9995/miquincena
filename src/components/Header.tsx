@@ -3,19 +3,39 @@
 import { useState, useEffect, useRef } from 'react';
 import { Menu, X, LogOut, Cloud, AlertCircle, Wifi, CheckCircle, Loader2 } from 'lucide-react';
 import { useGoogleAuth } from '@/context/GoogleAuthContext';
+import { Workspace } from '@/types';
 import GoogleSignIn from './GoogleSignIn';
+import WorkspaceSwitcher from './WorkspaceSwitcher';
+import WorkspaceManager from './WorkspaceManager';
 
 interface HeaderProps {
   onConfigClick?: () => void;
+  workspaces: Workspace[];
+  activeWorkspace: Workspace | null;
+  activeWorkspaceId: string | null;
+  onCreateWorkspace: (name: string) => string;
+  onRenameWorkspace: (id: string, name: string) => void;
+  onDeleteWorkspace: (id: string) => boolean;
+  onSwitchWorkspace: (id: string) => void;
 }
 
-export default function Header({ onConfigClick }: HeaderProps) {
+export default function Header({ 
+  onConfigClick,
+  workspaces,
+  activeWorkspace,
+  activeWorkspaceId,
+  onCreateWorkspace,
+  onRenameWorkspace,
+  onDeleteWorkspace,
+  onSwitchWorkspace,
+}: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<'about' | 'guide' | null>(null);
   const [showSuccessNotification, setShowSuccessNotification] = useState(false);
   const [showSyncIndicator, setShowSyncIndicator] = useState(false);
   const [syncIndicatorFading, setSyncIndicatorFading] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [isWorkspaceManagerOpen, setIsWorkspaceManagerOpen] = useState(false);
   const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { isAuthenticated, user, isSyncing, syncStatus, isOnline, signOut } = useGoogleAuth();
 
@@ -94,7 +114,17 @@ export default function Header({ onConfigClick }: HeaderProps) {
               alt="Mi Quincena Logo" 
               className="w-10 h-10 md:w-12 md:h-12 object-contain"
             />
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Mi Quincena</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-800 hidden sm:block">Mi Quincena</h1>
+            
+            {/* Workspace Switcher */}
+            {workspaces.length > 0 && (
+              <WorkspaceSwitcher
+                workspaces={workspaces}
+                activeWorkspace={activeWorkspace}
+                onSwitch={onSwitchWorkspace}
+                onOpenManager={() => setIsWorkspaceManagerOpen(true)}
+              />
+            )}
             
             {/* Compact Sync Status Indicator */}
             {isAuthenticated && showSyncIndicator && (
@@ -390,6 +420,18 @@ export default function Header({ onConfigClick }: HeaderProps) {
           </div>
         </div>
       )}
+
+      {/* Workspace Manager Modal */}
+      <WorkspaceManager
+        isOpen={isWorkspaceManagerOpen}
+        onClose={() => setIsWorkspaceManagerOpen(false)}
+        workspaces={workspaces}
+        activeWorkspaceId={activeWorkspaceId}
+        onCreate={onCreateWorkspace}
+        onRename={onRenameWorkspace}
+        onDelete={onDeleteWorkspace}
+        onSwitch={onSwitchWorkspace}
+      />
     </>
   );
 }
