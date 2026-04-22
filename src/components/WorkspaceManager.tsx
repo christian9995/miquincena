@@ -8,7 +8,7 @@ interface WorkspaceManagerProps {
     isOpen: boolean;
     onClose: () => void;
     workspaces: Workspace[];
-    activeWorkspaceId: string | null;
+    activeWorkspaceId: string | undefined;
     onCreate: (name: string) => string;
     onRename: (workspaceId: string, newName: string) => void;
     onDelete: (workspaceId: string) => boolean;

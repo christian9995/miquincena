@@ -31,7 +31,7 @@ const createDefaultWorkspace = (existingTransactions: Transaction[] = [], existi
 
 export function useFinance() {
     const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-    const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
+    const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | undefined>(undefined);
     const [currentPeriodIndex, setCurrentPeriodIndex] = useState(0);
     const [isInitialized, setIsInitialized] = useState(false);
     const [seedDate, setSeedDate] = useState('2026-01-02');
@@ -188,7 +188,7 @@ export function useFinance() {
                         transactions: deduplicateTransactions(ws.transactions || []),
                     }));
                     setWorkspaces(cleanedWorkspaces);
-                    setActiveWorkspaceId(savedActiveWorkspace || cleanedWorkspaces[0]?.id || null);
+                    setActiveWorkspaceId(savedActiveWorkspace || cleanedWorkspaces[0]?.id || undefined);
                     
                     // Set current period based on today's date
                     const todayPeriodIndex = getCurrentPeriodIndex(new Date(), parsedSeedDate);
@@ -530,7 +530,7 @@ export function useFinance() {
         // If deleting the active workspace, switch to the first remaining one
         if (activeWorkspaceId === workspaceId) {
             const remaining = workspaces.filter(ws => ws.id !== workspaceId);
-            setActiveWorkspaceId(remaining[0]?.id || null);
+            setActiveWorkspaceId(remaining[0]?.id || undefined);
         }
         return true;
     }, [workspaces, activeWorkspaceId]);

@@ -12,7 +12,7 @@ interface HeaderProps {
   onConfigClick?: () => void;
   workspaces: Workspace[];
   activeWorkspace: Workspace | null;
-  activeWorkspaceId: string | null;
+  activeWorkspaceId: string | undefined;
   onCreateWorkspace: (name: string) => string;
   onRenameWorkspace: (id: string, name: string) => void;
   onDeleteWorkspace: (id: string) => boolean;
