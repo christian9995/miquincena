@@ -69,19 +69,20 @@ export default function TransactionForm({ onSubmit, editingTransaction, onCancel
         <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-md space-y-4 mb-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <input
-                    type="text"
-                    placeholder="Descripción"
-                    value={desc}
-                    onChange={(e) => setDesc(e.target.value)}
-                    required
-                    className="w-full p-3 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <input
                     type="number"
                     placeholder="Monto $"
                     step="0.01"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
+                    required
+                    autoFocus
+                    className="w-full p-3 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <input
+                    type="text"
+                    placeholder="Descripción"
+                    value={desc}
+                    onChange={(e) => setDesc(e.target.value)}
                     required
                     className="w-full p-3 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
                 />
