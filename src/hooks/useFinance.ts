@@ -154,22 +154,21 @@ export function useFinance() {
                             console.log('[v0] No data in Google Drive, uploading local data');
                             await saveAppStateToDrive(accessToken, {
                                 ...localData,
-                                workspaces: workspaces,
-                                activeWorkspaceId: activeWorkspaceId,
+                                workspaces,
+                                activeWorkspaceId: activeWorkspaceId ?? undefined,
                                 timestamp: Date.now(),
                             });
-                        updateSyncStatus(false, 'synced');
-                    }
-                }
-                // Only allow the save effect after Drive has been checked.
-                driveLoadCompleteRef.current = true;
-            } catch (driveErr) {
-                driveLoadCompleteRef.current = true;
-                console.log('[v0] Google Drive sync not available - using localStorage only');
+                            updateSyncStatus(false, 'synced');
+                        }
+                    } catch (driveErr) {
+                        driveLoadCompleteRef.current = true;
+                        console.log('[v0] Google Drive sync not available - using localStorage only');
                         console.log('[v0] Error:', driveErr);
                         updateSyncStatus(false, 'offline');
                     }
                 }
+                // Only allow the save effect after Drive has been checked.
+                driveLoadCompleteRef.current = true;
             } catch (err) {
                 console.error('[v0] Error initializing app:', err);
                 loadFromLocalStorage();
