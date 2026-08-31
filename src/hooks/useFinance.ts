@@ -80,6 +80,7 @@ export function useFinance() {
     const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const autoPullIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const localTimestampRef = useRef<number>(0);
+    const driveLoadCompleteRef = useRef(false);
 
     // Deduplicate transactions by ID (cleanup for any previous bugs)
     const deduplicateTransactions = (txs: Transaction[]): Transaction[] => {
@@ -107,6 +108,7 @@ export function useFinance() {
     useEffect(() => {
         const initializeApp = async () => {
             try {
+                driveLoadCompleteRef.current = false;
                 // Always load from localStorage first (Offline-First)
                 const localData = loadFromLocalStorage();
                 
@@ -130,12 +132,15 @@ export function useFinance() {
                                 setActiveWorkspaceId(driveData.activeWorkspaceId || cloudWorkspaces[0]?.id);
                             } else {
                                 // Legacy data - migrate to workspace format
-                                const merged = deepMergeAppState(localData, driveData);
-                                const dedupedTransactions = deduplicateTransactions(merged.transactions);
-                                const migratedWorkspace = createDefaultWorkspace(dedupedTransactions, merged.budgets);
+                                // Legacy Drive data is authoritative during migration.
+                                const dedupedTransactions = deduplicateTransactions(driveData.transactions || []);
+                                const migratedWorkspace = createDefaultWorkspace(
+                                    dedupedTransactions,
+                                    driveData.budgets || {}
+                                );
                                 setWorkspaces([migratedWorkspace]);
                                 setActiveWorkspaceId(migratedWorkspace.id);
-                                setSeedDate(merged.seedDate);
+                                setSeedDate(driveData.seedDate || localData.seedDate);
                             }
                             
                             updateSyncStatus(false, 'synced');
@@ -153,10 +158,14 @@ export function useFinance() {
                                 activeWorkspaceId: activeWorkspaceId,
                                 timestamp: Date.now(),
                             });
-                            updateSyncStatus(false, 'synced');
-                        }
-                    } catch (driveErr) {
-                        console.log('[v0] Google Drive sync not available - using localStorage only');
+                        updateSyncStatus(false, 'synced');
+                    }
+                }
+                // Only allow the save effect after Drive has been checked.
+                driveLoadCompleteRef.current = true;
+            } catch (driveErr) {
+                driveLoadCompleteRef.current = true;
+                console.log('[v0] Google Drive sync not available - using localStorage only');
                         console.log('[v0] Error:', driveErr);
                         updateSyncStatus(false, 'offline');
                     }
@@ -260,6 +269,8 @@ export function useFinance() {
     // Queue sync to Google Drive when data changes
     useEffect(() => {
         if (!isInitialized || workspaces.length === 0) return;
+        // Do not overwrite an existing Drive file while its initial contents are loading.
+        if (isAuthenticated && accessToken && isOnline && !driveLoadCompleteRef.current) return;
 
         // ALWAYS save to localStorage first
         const now = Date.now();

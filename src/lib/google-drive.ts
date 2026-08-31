@@ -3,7 +3,7 @@
  * Handles all interactions with Google Drive for data storage using drive.appdata scope
  */
 
-const FILE_NAME = 'miquincena-data.json';
+const FILE_NAME = 'miquincena_data.json';
 
 export interface Workspace {
   id: string;
