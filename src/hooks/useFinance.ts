@@ -122,20 +122,42 @@ export function useFinance() {
                             // Check if drive data has workspaces
                             if (driveData.workspaces && driveData.workspaces.length > 0) {
                                 // Use workspace data from cloud
+                                const localTransactions = localData.transactions || [];
                                 const cloudWorkspaces = driveData.workspaces.map(ws => ({
                                     ...ws,
-                                    transactions: deduplicateTransactions(ws.transactions || []),
+                                    // Preserve legacy/local transactions, then let cloud IDs overwrite duplicates.
+                                    transactions: deduplicateTransactions([
+                                        ...localTransactions,
+                                        ...(ws.transactions || []),
+                                    ]),
                                 }));
                                 setWorkspaces(cloudWorkspaces);
                                 setActiveWorkspaceId(driveData.activeWorkspaceId || cloudWorkspaces[0]?.id);
                             } else {
-                                // Legacy data - migrate to workspace format
-                                const merged = deepMergeAppState(localData, driveData);
-                                const dedupedTransactions = deduplicateTransactions(merged.transactions);
-                                const migratedWorkspace = createDefaultWorkspace(dedupedTransactions, merged.budgets);
+                                // Legacy Drive data: preserve local data and upsert cloud transactions by ID.
+                                const localTransactions = localData.transactions || [];
+                                const cloudTransactions = Array.isArray(driveData.transactions)
+                                    ? driveData.transactions
+                                    : [];
+                                const transactionsById = new Map<string, Transaction>();
+
+                                for (const transaction of localTransactions) {
+                                    if (transaction?.id) transactionsById.set(transaction.id, transaction);
+                                }
+                                for (const transaction of cloudTransactions) {
+                                    if (transaction?.id) transactionsById.set(transaction.id, transaction);
+                                }
+
+                                const mergedTransactions = deduplicateTransactions([
+                                    ...transactionsById.values(),
+                                ]);
+                                const migratedWorkspace = createDefaultWorkspace(
+                                    mergedTransactions,
+                                    driveData.budgets || localData.budgets || {}
+                                );
                                 setWorkspaces([migratedWorkspace]);
                                 setActiveWorkspaceId(migratedWorkspace.id);
-                                setSeedDate(merged.seedDate);
+                                setSeedDate(driveData.seedDate || localData.seedDate);
                             }
                             
                             updateSyncStatus(false, 'synced');

@@ -3,7 +3,8 @@
  * Handles all interactions with Google Drive for data storage using drive.appdata scope
  */
 
-const FILE_NAME = 'miquincena-data.json';
+const FILE_NAME = 'miquincena_data.json';
+const LEGACY_FILE_NAME = 'miquincena-data.json';
 
 export interface Workspace {
   id: string;
@@ -143,7 +144,7 @@ export async function getCloudTimestamp(accessToken: string): Promise<number | n
 
     // Search for existing file and get modifiedTime
     const searchResponse = await fetch(
-      `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='${FILE_NAME}'&fields=files(id,modifiedTime)`,
+      `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=(name='${FILE_NAME}' or name='${LEGACY_FILE_NAME}')&fields=files(id,modifiedTime)`,
       {
         headers: { 
           Authorization: `Bearer ${accessToken}`,
@@ -192,7 +193,7 @@ export async function loadAppStateFromDrive(accessToken: string): Promise<AppSta
     
     // Search for existing file
     const searchResponse = await fetch(
-      `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='${FILE_NAME}'&fields=files(id,modifiedTime)`,
+      `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=(name='${FILE_NAME}' or name='${LEGACY_FILE_NAME}')&fields=files(id,modifiedTime)`,
       {
         headers: { 
           Authorization: `Bearer ${accessToken}`,
