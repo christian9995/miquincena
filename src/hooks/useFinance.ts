@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Transaction, Budgets, TransactionType, Workspace } from '@/types';
 import { getCurrentPeriodIndex, getPeriodDates } from '@/lib/finance-utils';
 import { useGoogleAuth } from '@/context/GoogleAuthContext';
-import { saveAppStateToDrive, loadAppStateFromDrive, getCloudTimestamp } from '@/lib/google-drive';
+import { saveAppStateToDrive, loadAppStateFromDrive, getCloudTimestamp, loadAllAppStateBackupsFromDrive } from '@/lib/google-drive';
 import { resolveSyncConflict, deepMergeAppState, mirrorSyncFromCloud } from '@/lib/sync-manager';
 
 const STORAGE_KEY_TRANSACTIONS = 'finanzas_v2026';
@@ -564,6 +564,46 @@ export function useFinance() {
         }
     }, [workspaces]);
 
+    const recoverTransactions = useCallback(async (): Promise<number> => {
+        const localRaw = localStorage.getItem(STORAGE_KEY_TRANSACTIONS);
+        let localTransactions: Transaction[] = [];
+        if (localRaw) {
+            try {
+                localTransactions = JSON.parse(localRaw);
+            } catch {
+                localTransactions = [];
+            }
+        }
+
+        const backups = isAuthenticated && accessToken
+            ? await loadAllAppStateBackupsFromDrive(accessToken)
+            : [];
+        const mergedById = new Map<string, Transaction>();
+        for (const transaction of localTransactions) {
+            if (transaction?.id && !deletedIds.includes(transaction.id)) mergedById.set(transaction.id, transaction);
+        }
+        for (const backup of backups) {
+            const globalDeletedIds = backup.deletedIds || [];
+            for (const transaction of backup.transactions || []) {
+                if (transaction?.id && !globalDeletedIds.includes(transaction.id) && !deletedIds.includes(transaction.id)) {
+                    mergedById.set(transaction.id, transaction);
+                }
+            }
+            for (const workspace of backup.workspaces || []) {
+                for (const transaction of workspace.transactions || []) {
+                    if (transaction?.id && !workspace.deletedIds?.includes(transaction.id) && !deletedIds.includes(transaction.id)) {
+                        mergedById.set(transaction.id, transaction);
+                    }
+                }
+            }
+        }
+
+        const recovered = deduplicateTransactions(Array.from(mergedById.values()));
+        updateActiveWorkspace((workspace) => ({ ...workspace, transactions: recovered }));
+        localStorage.setItem(STORAGE_KEY_TRANSACTIONS, JSON.stringify(recovered));
+        return recovered.length;
+    }, [accessToken, deletedIds, isAuthenticated, updateActiveWorkspace]);
+
     return {
         transactions,
         budgets,
@@ -578,6 +618,7 @@ export function useFinance() {
         isInitialized,
         seedDate,
         setSeedDate,
+        recoverTransactions,
         // Workspace exports
         workspaces,
         activeWorkspace,

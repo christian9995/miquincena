@@ -179,6 +179,32 @@ export async function getCloudTimestamp(accessToken: string): Promise<number | n
 }
 
 /**
+ * Find and load every historical backup with either supported filename.
+ * This is intentionally read-only so recovery can never overwrite Drive data.
+ */
+export async function loadAllAppStateBackupsFromDrive(accessToken: string): Promise<AppState[]> {
+  if (!accessToken) return [];
+
+  const response = await fetch(
+    `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=(name='${FILE_NAME}' or name='${LEGACY_FILE_NAME}')&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  if (!response.ok) throw new Error(`Drive history search failed (${response.status})`);
+
+  const { files = [] } = await response.json() as { files: DriveFile[] };
+  const backups = await Promise.all(files.map(async (file) => {
+    const content = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!content.ok) return null;
+    const parsed = await content.json();
+    return parsed && typeof parsed === 'object' ? parsed as AppState : null;
+  }));
+
+  return backups.filter((backup): backup is AppState => backup !== null);
+}
+
+/**
  * Load app state from Google Drive
  */
 export async function loadAppStateFromDrive(accessToken: string): Promise<AppState | null> {

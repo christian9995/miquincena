@@ -34,6 +34,7 @@ export default function Home() {
     renameWorkspace,
     deleteWorkspace,
     switchWorkspace,
+    recoverTransactions,
   } = useFinance() as any; // Casting for simplicity in this step, ideally use proper types
 
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -74,6 +75,7 @@ export default function Home() {
         onRenameWorkspace={renameWorkspace}
         onDeleteWorkspace={deleteWorkspace}
         onSwitchWorkspace={switchWorkspace}
+        onRecoverTransactions={recoverTransactions}
       />
       <main className="min-h-screen bg-[#f8f9fc] p-4 md:p-8">
         <div className="max-w-7xl mx-auto">
