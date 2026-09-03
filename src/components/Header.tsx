@@ -7,7 +7,6 @@ import { Workspace } from '@/types';
 import GoogleSignIn from './GoogleSignIn';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
 import WorkspaceManager from './WorkspaceManager';
-import EmergencyRecovery from './EmergencyRecovery';
 
 interface HeaderProps {
   onConfigClick?: () => void;
@@ -18,7 +17,6 @@ interface HeaderProps {
   onRenameWorkspace: (id: string, name: string) => void;
   onDeleteWorkspace: (id: string) => boolean;
   onSwitchWorkspace: (id: string) => void;
-  onRecoverTransactions: () => Promise<number>;
 }
 
 export default function Header({ 
@@ -30,7 +28,6 @@ export default function Header({
   onRenameWorkspace,
   onDeleteWorkspace,
   onSwitchWorkspace,
-  onRecoverTransactions,
 }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<'about' | 'guide' | null>(null);
@@ -255,8 +252,6 @@ export default function Header({
                   <GoogleSignIn />
                 </div>
               )}
-
-              {isAuthenticated && <EmergencyRecovery onRecover={onRecoverTransactions} />}
 
               {/* Menu Items */}
               <button

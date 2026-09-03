@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Transaction, Budgets, TransactionType, Workspace } from '@/types';
 import { getCurrentPeriodIndex, getPeriodDates } from '@/lib/finance-utils';
 import { useGoogleAuth } from '@/context/GoogleAuthContext';
-import { saveAppStateToDrive, loadAppStateFromDrive, getCloudTimestamp, loadAllAppStateBackupsFromDrive } from '@/lib/google-drive';
+import { saveAppStateToDrive, loadAppStateFromDrive, getCloudTimestamp } from '@/lib/google-drive';
 import { resolveSyncConflict, deepMergeAppState, mirrorSyncFromCloud } from '@/lib/sync-manager';
 
 const STORAGE_KEY_TRANSACTIONS = 'finanzas_v2026';
@@ -122,42 +122,20 @@ export function useFinance() {
                             // Check if drive data has workspaces
                             if (driveData.workspaces && driveData.workspaces.length > 0) {
                                 // Use workspace data from cloud
-                                const localTransactions = localData.transactions || [];
                                 const cloudWorkspaces = driveData.workspaces.map(ws => ({
                                     ...ws,
-                                    // Preserve legacy/local transactions, then let cloud IDs overwrite duplicates.
-                                    transactions: deduplicateTransactions([
-                                        ...localTransactions,
-                                        ...(ws.transactions || []),
-                                    ]),
+                                    transactions: deduplicateTransactions(ws.transactions || []),
                                 }));
                                 setWorkspaces(cloudWorkspaces);
                                 setActiveWorkspaceId(driveData.activeWorkspaceId || cloudWorkspaces[0]?.id);
                             } else {
-                                // Legacy Drive data: preserve local data and upsert cloud transactions by ID.
-                                const localTransactions = localData.transactions || [];
-                                const cloudTransactions = Array.isArray(driveData.transactions)
-                                    ? driveData.transactions
-                                    : [];
-                                const transactionsById = new Map<string, Transaction>();
-
-                                for (const transaction of localTransactions) {
-                                    if (transaction?.id) transactionsById.set(transaction.id, transaction);
-                                }
-                                for (const transaction of cloudTransactions) {
-                                    if (transaction?.id) transactionsById.set(transaction.id, transaction);
-                                }
-
-                                const mergedTransactions = deduplicateTransactions([
-                                    ...transactionsById.values(),
-                                ]);
-                                const migratedWorkspace = createDefaultWorkspace(
-                                    mergedTransactions,
-                                    driveData.budgets || localData.budgets || {}
-                                );
+                                // Legacy data - migrate to workspace format
+                                const merged = deepMergeAppState(localData, driveData);
+                                const dedupedTransactions = deduplicateTransactions(merged.transactions);
+                                const migratedWorkspace = createDefaultWorkspace(dedupedTransactions, merged.budgets);
                                 setWorkspaces([migratedWorkspace]);
                                 setActiveWorkspaceId(migratedWorkspace.id);
-                                setSeedDate(driveData.seedDate || localData.seedDate);
+                                setSeedDate(merged.seedDate);
                             }
                             
                             updateSyncStatus(false, 'synced');
@@ -564,46 +542,6 @@ export function useFinance() {
         }
     }, [workspaces]);
 
-    const recoverTransactions = useCallback(async (): Promise<number> => {
-        const localRaw = localStorage.getItem(STORAGE_KEY_TRANSACTIONS);
-        let localTransactions: Transaction[] = [];
-        if (localRaw) {
-            try {
-                localTransactions = JSON.parse(localRaw);
-            } catch {
-                localTransactions = [];
-            }
-        }
-
-        const backups = isAuthenticated && accessToken
-            ? await loadAllAppStateBackupsFromDrive(accessToken)
-            : [];
-        const mergedById = new Map<string, Transaction>();
-        for (const transaction of localTransactions) {
-            if (transaction?.id && !deletedIds.includes(transaction.id)) mergedById.set(transaction.id, transaction);
-        }
-        for (const backup of backups) {
-            const globalDeletedIds = backup.deletedIds || [];
-            for (const transaction of backup.transactions || []) {
-                if (transaction?.id && !globalDeletedIds.includes(transaction.id) && !deletedIds.includes(transaction.id)) {
-                    mergedById.set(transaction.id, transaction);
-                }
-            }
-            for (const workspace of backup.workspaces || []) {
-                for (const transaction of workspace.transactions || []) {
-                    if (transaction?.id && !workspace.deletedIds?.includes(transaction.id) && !deletedIds.includes(transaction.id)) {
-                        mergedById.set(transaction.id, transaction);
-                    }
-                }
-            }
-        }
-
-        const recovered = deduplicateTransactions(Array.from(mergedById.values()));
-        updateActiveWorkspace((workspace) => ({ ...workspace, transactions: recovered }));
-        localStorage.setItem(STORAGE_KEY_TRANSACTIONS, JSON.stringify(recovered));
-        return recovered.length;
-    }, [accessToken, deletedIds, isAuthenticated, updateActiveWorkspace]);
-
     return {
         transactions,
         budgets,
@@ -618,7 +556,6 @@ export function useFinance() {
         isInitialized,
         seedDate,
         setSeedDate,
-        recoverTransactions,
         // Workspace exports
         workspaces,
         activeWorkspace,
